@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { NAV_LINKS } from '@/lib/constants'
+import { NAV_LINKS, ROUTES } from '@/lib/constants'
 import { EyeMark } from '@/components/ui/EyeMark'
 
 export function Header() {
@@ -57,7 +57,7 @@ export function Header() {
         {/* Right CTA */}
         <div className="flex items-center gap-2">
           <Link
-            href="#launch"
+            href={ROUTES.app}
             className="hidden rounded-sm border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-all hover:border-primary/70 hover:bg-primary/20 sm:inline-flex"
           >
             Launch App
@@ -89,7 +89,7 @@ export function Header() {
               </Link>
             ))}
             <Link
-              href="#launch"
+              href={ROUTES.app}
               onClick={() => setOpen(false)}
               className="mt-4 inline-flex justify-center rounded-sm border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary"
             >

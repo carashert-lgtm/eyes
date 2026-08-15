@@ -1,5 +1,7 @@
 import { Container } from '@/components/ui/Container'
 import { CtaButton } from '@/components/ui/CtaButton'
+import { SocialLinks } from '@/components/layout/SocialLinks'
+import { ROUTES } from '@/lib/site-config'
 
 export function TokenomicsHero() {
   return (
@@ -53,15 +55,15 @@ export function TokenomicsCta() {
           </p>
 
           <div className="relative mt-10 flex flex-wrap items-center justify-center gap-4">
-            <CtaButton href="/">Back to Home</CtaButton>
-            <CtaButton href="/#launch" variant="secondary">
-              Launch App
+            <CtaButton href={ROUTES.app}>Launch App</CtaButton>
+            <CtaButton href={ROUTES.home} variant="secondary">
+              Back to Home
             </CtaButton>
           </div>
 
-          <p className="relative mt-6 font-mono-label text-muted-foreground">
-            Community link coming soon
-          </p>
+          <div className="relative mt-6 flex flex-col items-center gap-3">
+            <SocialLinks />
+          </div>
         </div>
       </Container>
     </section>

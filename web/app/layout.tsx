@@ -1,6 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import { Header } from '@/components/layout/Header'
-import { Footer } from '@/components/layout/Footer'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -38,21 +36,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased">
-        <div className="relative min-h-screen overflow-x-hidden bg-background">
-          <div
-            aria-hidden
-            className="pointer-events-none fixed inset-0 bg-grid opacity-40 mask-fade-b"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none fixed inset-x-0 top-0 h-[520px] bg-scan"
-          />
-          <Header />
-          <main>{children}</main>
-          <Footer />
-        </div>
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   )
 }

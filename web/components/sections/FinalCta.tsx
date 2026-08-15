@@ -1,5 +1,6 @@
 import { Section, Eyebrow } from '@/components/ui/Section'
 import { CtaButton } from '@/components/ui/CtaButton'
+import { ROUTES } from '@/lib/site-config'
 
 export function FinalCta() {
   return (
@@ -28,8 +29,8 @@ export function FinalCta() {
           </p>
 
           <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <CtaButton href="#launch">Launch App</CtaButton>
-            <CtaButton href="/tokenomics" variant="secondary">
+            <CtaButton href={ROUTES.app}>Launch App</CtaButton>
+            <CtaButton href={ROUTES.tokenomics} variant="secondary">
               Read Tokenomics
             </CtaButton>
           </div>

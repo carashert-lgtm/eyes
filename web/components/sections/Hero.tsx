@@ -1,6 +1,7 @@
 import { CtaButton } from '@/components/ui/CtaButton'
 import { SpinningCoin } from '@/components/ui/SpinningCoin'
 import { LaunchCountdown } from '@/components/ui/LaunchCountdown'
+import { ROUTES } from '@/lib/site-config'
 
 const STATS = [
   { label: 'LP lock', value: '100%' },
@@ -52,8 +53,8 @@ export function Hero() {
 
           {/* 4. CTAs */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <CtaButton href="#launch">Launch App</CtaButton>
-            <CtaButton href="/tokenomics" variant="secondary">
+            <CtaButton href={ROUTES.app}>Launch App</CtaButton>
+            <CtaButton href={ROUTES.tokenomics} variant="secondary">
               Read Tokenomics
             </CtaButton>
           </div>

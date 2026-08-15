@@ -1,12 +1,14 @@
 import Link from 'next/link'
 import { EyeMark } from '@/components/ui/EyeMark'
+import { SocialLinks } from '@/components/layout/SocialLinks'
+import { ROUTES, STATUS } from '@/lib/site-config'
 
 const FOOTER_LINKS = [
-  { label: 'How it works', href: '#how-it-works' },
-  { label: 'Tokenomics', href: '/tokenomics' },
-  { label: 'Launch support', href: '/launch-support' },
-  { label: 'Features', href: '#features' },
-  { label: 'Launch App', href: '#launch' },
+  { label: 'How it works', href: `${ROUTES.home}#how-it-works` },
+  { label: 'Tokenomics', href: ROUTES.tokenomics },
+  { label: 'Launch support', href: ROUTES.launchSupport },
+  { label: 'Features', href: `${ROUTES.home}#features` },
+  { label: 'Launch App', href: ROUTES.app },
 ]
 
 export function Footer() {
@@ -30,6 +32,7 @@ export function Footer() {
             <p className="mt-4 font-display text-lg font-bold text-foreground text-balance">
               Eyes Open. No Snipers. No Games.
             </p>
+            <SocialLinks className="mt-6" />
           </div>
 
           <nav className="grid grid-cols-2 gap-x-12 gap-y-3 sm:grid-cols-1">
@@ -50,7 +53,7 @@ export function Footer() {
             © {new Date().getFullYear()} Eyes Open
           </p>
           <p className="font-mono-label text-muted-foreground">
-            Testnet live · Mainnet after audit
+            {STATUS.networkDetail}
           </p>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { Container } from '@/components/ui/Container'
 import { CtaButton } from '@/components/ui/CtaButton'
 import { DiagramCard } from '@/components/ui/DiagramCard'
 import { SectionHeading } from '@/components/ui/SectionHeading'
+import { ROUTES } from '@/lib/site-config'
 
 export const metadata: Metadata = {
   title: 'Launch Support Window | Eyes Open ($EYES)',
@@ -96,7 +97,7 @@ export default function LaunchSupportPage() {
                 <p>
                   After public launch, platform trading fees (1% via EyesFeeRouter)
                   follow the documented{' '}
-                  <Link href="/tokenomics" className="text-primary hover:underline">
+                  <Link href={ROUTES.tokenomics} className="text-primary hover:underline">
                     50/50 split
                   </Link>
                   : half to creators, half to buy & burn $EYES.
@@ -160,15 +161,15 @@ export default function LaunchSupportPage() {
               Join launch support
             </h2>
             <p className="relative mx-auto mt-4 max-w-xl text-muted-foreground">
-              Contribution flow coming soon. Until then, follow official channels
-              for window dates and participation details.
+              Make a bootstrap contribution to the pre-launch growth pool. 100%
+              allocated to launch visibility and distribution.
             </p>
             <div className="relative mt-10 flex flex-wrap items-center justify-center gap-4">
-              <CtaButton href="#">Join Launch Support</CtaButton>
-              <CtaButton href="/tokenomics" variant="secondary">
+              <CtaButton href={ROUTES.appSupport}>Join Launch Support</CtaButton>
+              <CtaButton href={ROUTES.tokenomics} variant="secondary">
                 Read Tokenomics
               </CtaButton>
-              <CtaButton href="/">Back to Home</CtaButton>
+              <CtaButton href={ROUTES.home}>Back to Home</CtaButton>
             </div>
           </div>
         </Container>

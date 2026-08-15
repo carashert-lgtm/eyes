@@ -1,0 +1,92 @@
+/**
+ * Central site configuration — routes, socials, contracts, feature flags.
+ * Update social URLs here when accounts go live.
+ */
+
+export const BRAND = {
+  name: 'Eyes Open',
+  ticker: '$EYES',
+  slogan: 'Eyes Open. No Snipers. No Games.',
+  tagline: 'Fair launch infrastructure on Base',
+} as const
+
+export const ROUTES = {
+  home: '/',
+  tokenomics: '/tokenomics',
+  launchSupport: '/launch-support',
+  app: '/app',
+  appCreate: '/app/create',
+  appLaunches: '/app/launches',
+  appSupport: '/app/support',
+} as const
+
+/** Replace placeholders when social accounts are live. */
+export const SOCIAL_LINKS = {
+  x: process.env.NEXT_PUBLIC_SOCIAL_X ?? 'https://x.com/eyesopen',
+  telegram: process.env.NEXT_PUBLIC_SOCIAL_TELEGRAM ?? 'https://t.me/eyesopen',
+  discord: process.env.NEXT_PUBLIC_SOCIAL_DISCORD ?? '',
+} as const
+
+export const SOCIAL_PLACEHOLDER = 'Set NEXT_PUBLIC_SOCIAL_* in env or edit lib/site-config.ts'
+
+export function isSocialConfigured(url: string | undefined): url is string {
+  return Boolean(url && url !== '#' && !url.includes('YOUR_'))
+}
+
+export const CONTRACTS = {
+  chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? '84532'),
+  chainName: process.env.NEXT_PUBLIC_CHAIN_NAME ?? 'Base Sepolia',
+  eyesToken: process.env.NEXT_PUBLIC_EYES_TOKEN_ADDRESS ?? '',
+  launchFactory: process.env.NEXT_PUBLIC_LAUNCH_FACTORY_ADDRESS ?? '',
+  feeCollector: process.env.NEXT_PUBLIC_FEE_COLLECTOR_ADDRESS ?? '',
+} as const
+
+export const FEATURES = {
+  /** Real wallet connect via wagmi — UI shell only until true */
+  walletConnect: process.env.NEXT_PUBLIC_FEATURE_WALLET === 'true',
+  /** On-chain createLaunch tx */
+  createLaunchDeploy: process.env.NEXT_PUBLIC_FEATURE_CREATE_LAUNCH === 'true',
+  /** Launch support contribution tx */
+  launchSupportContribute:
+    process.env.NEXT_PUBLIC_FEATURE_LAUNCH_SUPPORT === 'true',
+  /** Live on-chain stats on dashboard */
+  liveStats: process.env.NEXT_PUBLIC_FEATURE_LIVE_STATS === 'true',
+} as const
+
+export const STATUS = {
+  network: 'Testnet',
+  networkDetail: 'Base Sepolia · Mainnet after audit',
+  wiringBadge: 'Testnet · wiring pending',
+} as const
+
+export const LAUNCH_END_ISO: string | null =
+  process.env.NEXT_PUBLIC_LAUNCH_END_ISO ?? null
+
+export const NAV_LINKS = [
+  { label: 'Problem', href: '#problem' },
+  { label: 'Solution', href: '#solution' },
+  { label: 'How it works', href: '#how-it-works' },
+  { label: 'Tokenomics', href: ROUTES.tokenomics },
+  { label: 'Launch support', href: ROUTES.launchSupport },
+  { label: 'Features', href: '#features' },
+] as const
+
+export const APP_NAV_LINKS = [
+  { label: 'Dashboard', href: ROUTES.app },
+  { label: 'Launches', href: ROUTES.appLaunches },
+  { label: 'Create Launch', href: ROUTES.appCreate },
+  { label: 'Launch Support', href: ROUTES.appSupport },
+] as const
+
+export const TOKENOMICS = {
+  tradingFee: '1%',
+  feeSplit: '50% creator / 50% buy & burn $EYES',
+  lpLock: '100%',
+  supply: '1,000,000,000',
+} as const
+
+export const LAUNCH_SUPPORT = {
+  windowDays: 14,
+  /** Placeholder for UI until backend provides real day */
+  currentDay: 1,
+} as const

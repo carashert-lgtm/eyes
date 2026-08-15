@@ -1,5 +1,6 @@
 import { Section, Eyebrow } from '@/components/ui/Section'
 import { CtaButton } from '@/components/ui/CtaButton'
+import { ROUTES } from '@/lib/site-config'
 
 const POOL_ITEMS = [
   'Content distribution and campaign execution',
@@ -26,11 +27,11 @@ export function LaunchSupport() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
-            <CtaButton href="/launch-support">
+            <CtaButton href={ROUTES.appSupport}>
               Contribute to Launch Growth
             </CtaButton>
             <a
-              href="/launch-support"
+              href={ROUTES.launchSupport}
               className="text-sm text-primary underline-offset-4 transition-colors hover:text-accent-glow hover:underline"
             >
               Read full details →
