@@ -1,29 +1,7 @@
 import type { Metadata, Viewport } from 'next'
-import { Syne, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import './globals.css'
-
-const syne = Syne({
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
-  variable: '--font-syne',
-  display: 'swap',
-})
-
-const plexSans = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
-  variable: '--font-plex-sans',
-  display: 'swap',
-})
-
-const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-  variable: '--font-plex-mono',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: 'Eyes Open | $EYES — Fair Launch Pad',
@@ -47,10 +25,19 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${syne.variable} ${plexSans.variable} ${plexMono.variable}`}
-    >
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="antialiased">
         <div className="relative min-h-screen overflow-x-hidden bg-background">
           <div
