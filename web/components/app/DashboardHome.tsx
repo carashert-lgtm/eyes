@@ -87,18 +87,18 @@ export function DashboardHome() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-xl">
             <p className="font-mono-label text-primary">
-              {LAUNCH_SUPPORT.windowDays}-day launch support window
+              {LAUNCH_SUPPORT.windowDays}-day presale window
             </p>
             <h2 className="mt-2 font-display text-xl font-bold text-foreground">
-              Bootstrap launch visibility
+              Join the presale
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               Community contributions fund operational launch readiness — content,
               channels, and outreach. Separate from on-chain trading-fee tokenomics.
             </p>
           </div>
-          <CtaButton href={ROUTES.appSupport} className="shrink-0">
-            Contribute to launch growth
+          <CtaButton href={ROUTES.presale} className="shrink-0">
+            Join Presale
           </CtaButton>
         </div>
       </div>

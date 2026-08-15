@@ -6,7 +6,7 @@ import { ROUTES, STATUS } from '@/lib/site-config'
 const FOOTER_LINKS = [
   { label: 'How it works', href: `${ROUTES.home}#how-it-works` },
   { label: 'Tokenomics', href: ROUTES.tokenomics },
-  { label: 'Launch support', href: ROUTES.launchSupport },
+  { label: 'Presale', href: ROUTES.presale },
   { label: 'Features', href: `${ROUTES.home}#features` },
   { label: 'Launch App', href: ROUTES.app },
 ]

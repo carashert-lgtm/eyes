@@ -14,10 +14,12 @@ export const ROUTES = {
   home: '/',
   tokenomics: '/tokenomics',
   launchSupport: '/launch-support',
+  presale: '/presale',
   app: '/app',
   appCreate: '/app/create',
   appLaunches: '/app/launches',
-  appSupport: '/app/support',
+  /** @deprecated use presale */
+  appSupport: '/presale',
 } as const
 
 /** Replace placeholders when social accounts are live. */
@@ -67,7 +69,7 @@ export const NAV_LINKS = [
   { label: 'Solution', href: '#solution' },
   { label: 'How it works', href: '#how-it-works' },
   { label: 'Tokenomics', href: ROUTES.tokenomics },
-  { label: 'Launch support', href: ROUTES.launchSupport },
+  { label: 'Presale', href: ROUTES.presale },
   { label: 'Features', href: '#features' },
 ] as const
 
@@ -75,7 +77,7 @@ export const APP_NAV_LINKS = [
   { label: 'Dashboard', href: ROUTES.app },
   { label: 'Launches', href: ROUTES.appLaunches },
   { label: 'Create Launch', href: ROUTES.appCreate },
-  { label: 'Launch Support', href: ROUTES.appSupport },
+  { label: 'Presale', href: ROUTES.presale },
 ] as const
 
 export const TOKENOMICS = {

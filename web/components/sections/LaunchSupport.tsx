@@ -17,19 +17,17 @@ export function LaunchSupport() {
         <div>
           <Eyebrow>Pre-launch</Eyebrow>
           <h2 className="mt-5 font-display text-3xl font-bold tracking-tight text-foreground text-balance sm:text-4xl">
-            14-day launch support window.
+            14-day presale window.
           </h2>
           <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-            Before public launch, we run a fixed community bootstrap window.
-            Contributions form a pre-launch growth pool — 100% allocated to
+            Before public launch, we run a fixed community bootstrap presale.
+            Proceeds form a pre-launch growth pool — 100% allocated to
             launch visibility and distribution. Separate from on-chain
             trading-fee tokenomics.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
-            <CtaButton href={ROUTES.appSupport}>
-              Contribute to Launch Growth
-            </CtaButton>
+            <CtaButton href={ROUTES.presale}>Join Presale</CtaButton>
             <a
               href={ROUTES.launchSupport}
               className="text-sm text-primary underline-offset-4 transition-colors hover:text-accent-glow hover:underline"

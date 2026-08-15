@@ -165,7 +165,7 @@ export default function LaunchSupportPage() {
               allocated to launch visibility and distribution.
             </p>
             <div className="relative mt-10 flex flex-wrap items-center justify-center gap-4">
-              <CtaButton href={ROUTES.appSupport}>Join Launch Support</CtaButton>
+              <CtaButton href={ROUTES.presale}>Join Presale</CtaButton>
               <CtaButton href={ROUTES.tokenomics} variant="secondary">
                 Read Tokenomics
               </CtaButton>
