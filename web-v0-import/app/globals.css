@@ -1,0 +1,178 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Brand palette — Light Gold / Bitcoin glory */
+  --color-background: #faf7f0;
+  --color-foreground: #1c1917;
+
+  --color-surface: #fffcf5;
+  --color-card: #fffcf5;
+  --color-card-foreground: #1c1917;
+
+  --color-popover: #fffcf5;
+  --color-popover-foreground: #1c1917;
+
+  --color-border: #ecdcb0;
+  --color-input: #ecdcb0;
+  --color-ring: #c9a227;
+
+  --color-muted: #f4ecda;
+  --color-muted-foreground: #7c6f57;
+
+  --color-primary: #a97f12;
+  --color-primary-foreground: #fffdf7;
+
+  --color-accent-dim: #c9a227;
+  --color-accent-glow: #eab308;
+  --color-edge: #b45309;
+
+  --color-secondary: #f4ecda;
+  --color-secondary-foreground: #1c1917;
+  --color-accent: #f4ecda;
+  --color-accent-foreground: #1c1917;
+  --color-destructive: #b45309;
+
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-syne), var(--font-plex-sans), sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+}
+
+:root {
+  color-scheme: light;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  ::selection {
+    background: #d4af37;
+    color: #1c1917;
+  }
+}
+
+@layer utilities {
+  .font-mono-label {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 0.72rem;
+    line-height: 1;
+  }
+
+  /* Faint warm gold grid pattern */
+  .bg-grid {
+    background-image: linear-gradient(to right, rgba(169, 127, 18, 0.09) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(169, 127, 18, 0.09) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  /* Soft gold radial glow at top */
+  .bg-scan {
+    background: radial-gradient(62% 46% at 50% 0%, rgba(212, 175, 55, 0.28) 0%, rgba(212, 175, 55, 0.1) 40%, transparent 74%);
+  }
+
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
+  }
+
+  /* Gold accent-word gradient for headlines */
+  .text-gradient-white {
+    background: linear-gradient(180deg, #e6bd3f 0%, #b8860b 55%, #8b6914 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+@keyframes coin-spin {
+  0% {
+    transform: rotateY(0deg);
+  }
+  100% {
+    transform: rotateY(360deg);
+  }
+}
+
+@keyframes coin-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes orbit-cw {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbit-ccw {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes streak-drift {
+  0% {
+    opacity: 0;
+    transform: translateX(-40%);
+  }
+  40% {
+    opacity: 0.5;
+  }
+  60% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(40%);
+  }
+}

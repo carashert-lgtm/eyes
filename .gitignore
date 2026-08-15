@@ -1,0 +1,10 @@
+cache/
+out/
+lib/
+broadcast/
+data/
+deployments/base-sepolia.json
+deployments/base-sepolia.env
+.env
+.env.*
+!.env.example
