@@ -13,6 +13,7 @@ import {
   db,
 } from './db.js'
 import { activateTeamCode, validateTeamSession } from './team-codes.js'
+import { BOT_VERSION } from './bot-version.js'
 
 const BOT_FEATURES = ['claim', 'presalesend', 'team-claims-queue']
 
@@ -51,6 +52,7 @@ export function startWebhookServer(discordClient = null) {
         JSON.stringify({
           ok: true,
           service: 'eyes-bot-webhook',
+          version: BOT_VERSION,
           features: BOT_FEATURES,
           teamCodesActive,
           discordReady: Boolean(resolveClient()?.user),

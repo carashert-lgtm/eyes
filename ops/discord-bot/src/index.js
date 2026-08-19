@@ -38,6 +38,7 @@ import { startWebhookServer } from './webhook.js'
 import { distributePresaleTokens, getDistributorStatus } from './presale-distribute.js'
 import { inspectPrivateKeyEnv } from './private-key.js'
 import { buildHelpEmbeds, getTreasuryAddress } from './bot-format.js'
+import { BOT_VERSION } from './bot-version.js'
 import { privateKeyToAccount } from 'viem/accounts'
 import {
   createTeamActivationCode,
@@ -71,6 +72,12 @@ function parseUserArg(guild, arg) {
   if (!arg) return null
   const id = arg.replace(/[<@!>]/g, '')
   return guild.members.cache.get(id)?.user ?? null
+}
+
+function parseRoleArg(guild, arg) {
+  if (!arg) return null
+  const id = arg.replace(/[<@&>]/g, '')
+  return guild.roles.cache.get(id) ?? null
 }
 
 function parseTokenAmount(raw) {
@@ -159,8 +166,6 @@ function shouldRunDiscordGateway() {
 }
 
 const runDiscordGateway = shouldRunDiscordGateway()
-
-const BOT_VERSION = '2026-08-18-build-v3'
 
 /** Discord client for staff log webhooks (set after gateway connects). */
 let discordClientRef = null
@@ -698,6 +703,46 @@ client.on('messageCreate', async (message) => {
           lines.push(`· ${tag} #${s.id} skipped — ${s.reason}`)
         }
         await message.reply(lines.join('\n').slice(0, 1900))
+        break
+      }
+
+      case 'giverole': {
+        if (!isOwner(actor.id)) {
+          await message.reply('Owner only.')
+          break
+        }
+        const target = parseUserArg(guild, args[0])
+        const role = parseRoleArg(guild, args[1])
+        if (!target || !role) {
+          await message.reply('Usage: `!giverole @user @role`')
+          break
+        }
+        const member = await guild.members.fetch(target.id).catch(() => null)
+        if (!member) {
+          await message.reply('Member not found in this server.')
+          break
+        }
+        const botMember = guild.members.me ?? (await guild.members.fetchMe().catch(() => null))
+        if (!botMember?.permissions.has('ManageRoles')) {
+          await message.reply('I need **Manage Roles** permission.')
+          break
+        }
+        if (role.managed) {
+          await message.reply('That role is managed by an integration — assign it in Discord settings.')
+          break
+        }
+        if (role.position >= botMember.roles.highest.position) {
+          await message.reply('Move my bot role above that role in Server Settings → Roles.')
+          break
+        }
+        if (member.roles.cache.has(role.id)) {
+          await message.reply(`**${target.username}** already has **${role.name}**.`)
+          break
+        }
+        await member.roles.add(role, `!giverole by ${actor.tag}`)
+        logAudit('giverole', actor.id, target.id, null, role.name)
+        await staffLog(`🎭 ${actor.tag} gave **${role.name}** → **${target.tag}**`)
+        await message.reply(`Gave **${role.name}** → **${target.username}**`)
         break
       }
 

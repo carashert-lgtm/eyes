@@ -77,7 +77,7 @@ export function buildHelpEmbeds(isOwner) {
       },
       {
         name: 'Ops',
-        value: '`!discordinvite` · `!telegraminvite` · `!refclick` · `!whoami`',
+        value: '`!discordinvite` · `!telegraminvite` · `!refclick` · `!giverole` · `!whoami`',
         inline: false,
       },
     )
