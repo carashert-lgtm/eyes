@@ -1,0 +1,28 @@
+FROM node:22-bookworm-slim
+
+# Bust Railway layer cache when bot logic changes.
+ARG BOT_BUILD=2026-08-18-build-v3
+RUN echo "bot-build=${BOT_BUILD}" > /tmp/bot-build-id
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev
+
+COPY src ./src
+RUN grep -q "2026-08-18-build-v3" src/index.js
+RUN grep -q "buildHelpEmbeds" src/bot-format.js
+
+RUN mkdir -p /app/data
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV DB_PATH=/app/data/platform.db
+ENV SNAPSHOT_PATH=/app/data/platform-snapshot.json
+
+EXPOSE 3847
+
+CMD ["npm", "start"]

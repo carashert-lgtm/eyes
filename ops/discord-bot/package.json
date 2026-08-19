@@ -1,0 +1,22 @@
+{
+  "name": "eyes-discord-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "presale:distribute": "node src/cli/presale-distribute.js",
+    "presale:test-e2e": "node src/cli/test-presale-phase2.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "viem": "^2.31.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0"
+  }
+}
