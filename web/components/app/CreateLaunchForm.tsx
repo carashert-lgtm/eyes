@@ -1,12 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, Loader2, Upload } from 'lucide-react'
+import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { isAddress, type Address } from 'viem'
 import { WiringBadge } from '@/components/app/AppShell'
-import { FEATURES, ROUTES, TOKENOMICS } from '@/lib/site-config'
+import { FEATURES, ROUTES, TOKENOMICS, CONTRACTS } from '@/lib/site-config'
+import { LAUNCH_FEE_EYES } from '@/lib/retention-config'
 import { cn } from '@/lib/utils'
-import { truncateAddress, useWallet } from '@/lib/wallet-context'
+import { truncateAddress } from '@/lib/presale-config'
+import { LAUNCH_FACTORY_ABI } from '@/lib/contracts/launch-factory'
+import { PRESALE_CHAIN } from '@/lib/wagmi'
+import { useWallet } from '@/hooks/useWallet'
 
 const WINDOW_OPTIONS = [
   { label: '15 minutes', value: 900 },
@@ -30,7 +36,16 @@ type FormState = {
 type SubmitState = 'idle' | 'loading' | 'success' | 'error'
 
 export function CreateLaunchForm() {
-  const { connected, address, connect } = useWallet()
+  const { address, isConnected, connectInjected, wrongNetwork, switchToPresaleChain } =
+    useWallet()
+  const { writeContract, data: txHash, error: writeError, isPending, reset: resetWrite } =
+    useWriteContract()
+  const { isSuccess: txConfirmed, isLoading: txConfirming } =
+    useWaitForTransactionReceipt({ hash: txHash, chainId: PRESALE_CHAIN.id })
+
+  const factoryAddress = CONTRACTS.launchFactory
+  const factoryReady = isAddress(factoryAddress)
+
   const [form, setForm] = useState<FormState>({
     name: '',
     symbol: '',
@@ -43,15 +58,31 @@ export function CreateLaunchForm() {
   })
   const [submitState, setSubmitState] = useState<SubmitState>('idle')
 
+  useEffect(() => {
+    if (txConfirmed && submitState === 'loading') {
+      setSubmitState('success')
+    }
+  }, [txConfirmed, submitState])
+
+  useEffect(() => {
+    if (writeError && submitState === 'loading') {
+      setSubmitState('error')
+    }
+  }, [writeError, submitState])
+
   const previewSymbol = form.symbol.toUpperCase().slice(0, 6) || 'TKN'
   const previewInitials = previewSymbol.slice(0, 2)
 
   const canSubmit =
-    connected &&
+    isConnected &&
+    !wrongNetwork &&
+    factoryReady &&
     form.name.trim().length > 0 &&
     previewSymbol.length >= 2 &&
     form.agreed &&
-    submitState !== 'loading'
+    submitState !== 'loading' &&
+    !isPending &&
+    !txConfirming
 
   const windowLabel = useMemo(
     () =>
@@ -64,15 +95,35 @@ export function CreateLaunchForm() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleDeploy = async () => {
-    if (!canSubmit) return
+  const handleDeploy = () => {
+    if (!canSubmit || !address || !factoryReady) return
+
     if (!FEATURES.createLaunchDeploy) {
       setSubmitState('loading')
-      await new Promise((r) => setTimeout(r, 1200))
-      setSubmitState('success')
+      window.setTimeout(() => setSubmitState('success'), 1200)
       return
     }
-    // TODO: wire EyesLaunchFactory.createLaunch via wagmi
+
+    setSubmitState('loading')
+    resetWrite()
+
+    writeContract({
+      chainId: PRESALE_CHAIN.id,
+      address: factoryAddress as Address,
+      abi: LAUNCH_FACTORY_ABI,
+      functionName: 'createLaunch',
+      args: [
+        {
+          name: form.name.trim(),
+          symbol: previewSymbol,
+          creator: address,
+          tokenSupply: BigInt(0),
+          eyesWindowDuration: BigInt(form.windowSeconds),
+          creatorFeeBps: 0,
+          burnFeeBps: 0,
+        },
+      ],
+    })
   }
 
   return (
@@ -86,21 +137,41 @@ export function CreateLaunchForm() {
           Deploy a fair launch
         </h1>
         <p className="mt-3 text-muted-foreground">
-          Configure your token and Eyes Window rules. On-chain deploy wiring pending
-          on testnet.
+          Configure your token and Eyes Window rules, then deploy via{' '}
+          {CONTRACTS.chainName}.
         </p>
       </div>
 
-      {!connected ? (
+      {!isConnected ? (
         <div className="rounded-sm border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
           <button
             type="button"
-            onClick={connect}
+            onClick={connectInjected}
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
             Connect your wallet
           </button>{' '}
-          to create a launch on Base Sepolia testnet.
+          to create a launch on {CONTRACTS.chainName}.
+        </div>
+      ) : null}
+
+      {wrongNetwork ? (
+        <div className="rounded-sm border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          Wrong network —{' '}
+          <button
+            type="button"
+            onClick={switchToPresaleChain}
+            className="font-medium underline-offset-4 hover:underline"
+          >
+            switch to {PRESALE_CHAIN.name}
+          </button>
+        </div>
+      ) : null}
+
+      {!factoryReady ? (
+        <div className="rounded-sm border border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
+          Fair launch deployment is not live on {CONTRACTS.chainName} yet. This page will
+          open when the launch factory is deployed — check back after public go-live.
         </div>
       ) : null}
 
@@ -214,6 +285,18 @@ export function CreateLaunchForm() {
                   Only buys through the pad.
                 </p>
               </Field>
+              {FEATURES.retention ? (
+                <div className="rounded-sm border border-primary/20 bg-primary/5 p-4 text-sm">
+                  <p className="font-medium text-foreground">Settlement in $EYES</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Pay launch fee in $EYES for {LAUNCH_FEE_EYES.eyesDiscountPercent}% off vs ETH
+                    equivalent · {LAUNCH_FEE_EYES.burnPercent}% burned on settlement.
+                  </p>
+                  <p className="mt-2 font-mono-label text-[0.58rem] text-muted-foreground">
+                    On-chain $EYES payment wiring next — core deploy unchanged
+                  </p>
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Chip>Trading fee: {TOKENOMICS.tradingFee}</Chip>
                 <Chip>Fee split: {TOKENOMICS.feeSplit}</Chip>
@@ -283,11 +366,12 @@ export function CreateLaunchForm() {
         <div className="rounded-sm border border-primary/40 bg-primary/5 p-6 text-center">
           <Check className="mx-auto h-8 w-8 text-primary" />
           <h3 className="mt-3 font-display text-lg font-bold text-foreground">
-            Launch created (demo)
+            Launch created on-chain
           </h3>
           <p className="mt-2 text-sm text-muted-foreground">
-            Contract wiring pending. Preview saved for{' '}
-            {address ? truncateAddress(address) : 'your wallet'}.
+            {FEATURES.createLaunchDeploy && txHash
+              ? `Tx ${truncateAddress(txHash)} · creator ${truncateAddress(address)}`
+              : `Preview saved for ${address ? truncateAddress(address) : 'your wallet'}.`}
           </p>
           <Link
             href={ROUTES.appLaunches}
@@ -296,15 +380,19 @@ export function CreateLaunchForm() {
             View launches →
           </Link>
         </div>
+      ) : submitState === 'error' ? (
+        <div className="rounded-sm border border-destructive/40 bg-destructive/10 p-6 text-center text-sm text-destructive">
+          Launch deploy failed. Check Rabby is on {PRESALE_CHAIN.name} and factory is deployed.
+        </div>
       ) : (
         <div className="sticky bottom-0 -mx-6 border-t border-border bg-background/95 px-6 py-4 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              {connected
+              {isConnected
                 ? FEATURES.createLaunchDeploy
-                  ? 'Ready to deploy on Base Sepolia'
+                  ? `Ready to deploy on ${CONTRACTS.chainName}`
                   : 'Deploy disabled until factory contract is wired'
-                : 'Connect wallet to deploy on Base Sepolia testnet'}
+                : `Connect wallet to deploy on ${CONTRACTS.chainName}`}
             </p>
             <button
               type="button"

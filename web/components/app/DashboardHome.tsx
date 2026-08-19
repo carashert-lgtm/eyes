@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight, Plus, Rocket, Search } from 'lucide-react'
 import { DashboardStats } from '@/components/app/DashboardStats'
+import { RecentLaunchesFeed } from '@/components/app/RecentLaunchesFeed'
 import { WiringBadge } from '@/components/app/AppShell'
 import { CtaButton } from '@/components/ui/CtaButton'
 import { LAUNCH_SUPPORT, ROUTES, TOKENOMICS } from '@/lib/site-config'
@@ -115,18 +116,7 @@ export function DashboardHome() {
             View all
           </Link>
         </div>
-        <div className="rounded-sm border border-dashed border-border bg-surface/60 px-6 py-14 text-center">
-          <Rocket className="mx-auto h-8 w-8 text-muted-foreground/60" />
-          <p className="mt-4 font-display text-lg font-bold text-foreground">
-            No launches yet
-          </p>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
-            Be the first to launch fair on Eyes Open.
-          </p>
-          <div className="mt-6">
-            <CtaButton href={ROUTES.appCreate}>Create Launch</CtaButton>
-          </div>
-        </div>
+        <RecentLaunchesFeed />
       </div>
     </div>
   )

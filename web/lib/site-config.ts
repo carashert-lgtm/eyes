@@ -1,7 +1,9 @@
-/**
- * Central site configuration — routes, socials, contracts, feature flags.
- * Update social URLs here when accounts go live.
- */
+import {
+  ACTIVE_CHAIN_ID,
+  ACTIVE_CHAIN_NAME,
+  APP_ENV,
+  IS_LOCAL_ANVIL,
+} from '@/lib/chain-config'
 
 export const BRAND = {
   name: 'Eyes Open',
@@ -18,14 +20,27 @@ export const ROUTES = {
   app: '/app',
   appCreate: '/app/create',
   appLaunches: '/app/launches',
+  appUtility: '/app/utility',
+  appProfile: '/app/profile',
+  appLeaderboard: '/app/leaderboard',
+  appPool: '/app/pool',
+  team: '/team',
+  teamActivate: '/team/activate',
+  teamPool: '/team/pool',
+  legal: '/legal',
+  legalTerms: '/legal/terms',
+  legalPrivacy: '/legal/privacy',
+  legalRisk: '/legal/risk-disclosure',
+  legalCookies: '/legal/cookies',
+  legalAi: '/legal/ai',
   /** @deprecated use presale */
   appSupport: '/presale',
 } as const
 
 /** Replace placeholders when social accounts are live. */
 export const SOCIAL_LINKS = {
-  x: process.env.NEXT_PUBLIC_SOCIAL_X ?? 'https://x.com/eyesopen',
-  telegram: process.env.NEXT_PUBLIC_SOCIAL_TELEGRAM ?? 'https://t.me/eyesopen',
+  x: process.env.NEXT_PUBLIC_SOCIAL_X ?? 'https://x.com/eyesopenlaunch',
+  telegram: process.env.NEXT_PUBLIC_SOCIAL_TELEGRAM ?? 'https://t.me/+WGZTDwqoswNlODMx',
   discord: process.env.NEXT_PUBLIC_SOCIAL_DISCORD ?? '',
 } as const
 
@@ -36,8 +51,8 @@ export function isSocialConfigured(url: string | undefined): url is string {
 }
 
 export const CONTRACTS = {
-  chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? '84532'),
-  chainName: process.env.NEXT_PUBLIC_CHAIN_NAME ?? 'Base Sepolia',
+  chainId: ACTIVE_CHAIN_ID,
+  chainName: ACTIVE_CHAIN_NAME,
   eyesToken: process.env.NEXT_PUBLIC_EYES_TOKEN_ADDRESS ?? '',
   launchFactory: process.env.NEXT_PUBLIC_LAUNCH_FACTORY_ADDRESS ?? '',
   feeCollector: process.env.NEXT_PUBLIC_FEE_COLLECTOR_ADDRESS ?? '',
@@ -53,12 +68,28 @@ export const FEATURES = {
     process.env.NEXT_PUBLIC_FEATURE_LAUNCH_SUPPORT === 'true',
   /** Live on-chain stats on dashboard */
   liveStats: process.env.NEXT_PUBLIC_FEATURE_LIVE_STATS === 'true',
+  /** Retention systems master flag */
+  retention: process.env.NEXT_PUBLIC_FEATURE_RETENTION === 'true',
+  /** Discovery feed + rankings */
+  discovery: process.env.NEXT_PUBLIC_FEATURE_RETENTION === 'true' ||
+    process.env.NEXT_PUBLIC_FEATURE_DISCOVERY === 'true',
+  /** $EYES utility center + stake tiers */
+  utilityCenter: process.env.NEXT_PUBLIC_FEATURE_RETENTION === 'true' ||
+    process.env.NEXT_PUBLIC_FEATURE_UTILITY === 'true',
 } as const
 
 export const STATUS = {
-  network: 'Testnet',
-  networkDetail: 'Base Sepolia · Mainnet after audit',
-  wiringBadge: 'Testnet · wiring pending',
+  network: IS_LOCAL_ANVIL ? 'Local' : APP_ENV === 'production' ? 'Mainnet' : 'Testnet',
+  networkDetail: IS_LOCAL_ANVIL
+    ? `${ACTIVE_CHAIN_NAME} · chain ${ACTIVE_CHAIN_ID}`
+    : APP_ENV === 'production'
+      ? `${ACTIVE_CHAIN_NAME} · chain ${ACTIVE_CHAIN_ID}`
+      : 'Base Sepolia · pre-mainnet',
+  wiringBadge: IS_LOCAL_ANVIL
+    ? 'Local Anvil · chain 31337'
+    : APP_ENV === 'production'
+      ? 'Production'
+      : 'Staging · testnet',
 } as const
 
 export const LAUNCH_END_ISO: string | null =
@@ -75,7 +106,9 @@ export const NAV_LINKS = [
 
 export const APP_NAV_LINKS = [
   { label: 'Dashboard', href: ROUTES.app },
-  { label: 'Launches', href: ROUTES.appLaunches },
+  { label: 'Discover', href: ROUTES.appLaunches },
+  { label: 'Leaderboard', href: ROUTES.appLeaderboard },
+  { label: 'Utility', href: ROUTES.appUtility },
   { label: 'Create Launch', href: ROUTES.appCreate },
   { label: 'Presale', href: ROUTES.presale },
 ] as const
