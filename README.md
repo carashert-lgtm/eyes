@@ -1,6 +1,7 @@
 # Eyes Open ($EYES) - Fair Launch Pad
 
-**Start here:** [`docs/WINDOWS_SETUP.md`](docs/WINDOWS_SETUP.md)
+**Start here:** [`docs/LOCAL_ANVIL_TEST.md`](docs/LOCAL_ANVIL_TEST.md) — **full local test, no faucet**  
+Also: [`docs/WINDOWS_SETUP.md`](docs/WINDOWS_SETUP.md) · [`docs/LIVE_TEST_RUN.md`](docs/LIVE_TEST_RUN.md)
 
 **Eyes Open** is a fair-launch platform where every token gets an **Eyes Window** (gated buy period), **100% locked liquidity**, and trading fees that **buy & burn** the platform token **$EYES**.
 
@@ -24,13 +25,16 @@
 | `EyesFeeRouter` | Swap wrapper skimming **1%** fee to collector |
 | `EyesBuyBurnExecutor` | Swaps queued ETH → $EYES and **burns** |
 
-### Step 3 — Base Sepolia scripts
+### Step 3 — Deploy scripts
+
 | Script | Purpose |
 |--------|---------|
-| `script/DeployEyes.s.sol` | Deploy full stack + write `deployments/base-sepolia.json` |
+| `script/DeployEyes.s.sol` | Deploy full stack + write deployment JSON |
+| `script/DeployLocalDex.s.sol` | Mock Uniswap for **Anvil local** testing |
 | `script/SeedEyesLiquidity.s.sol` | Seed $EYES/WETH platform pool |
 | `script/EyesE2EDemo.s.sol` | Full launch → lock → swap → buy & burn demo |
-| `scripts/deploy-base-sepolia.ps1` | Windows helper for all steps |
+| `scripts/deploy-anvil.ps1` | **Local Anvil — no faucet** (recommended) |
+| `scripts/deploy-base-sepolia.ps1` | Base Sepolia testnet (optional) |
 
 ---
 

@@ -1,6 +1,5 @@
 import { Container } from '@/components/ui/Container'
 import { CtaButton } from '@/components/ui/CtaButton'
-import { SocialLinks } from '@/components/layout/SocialLinks'
 import { ROUTES } from '@/lib/site-config'
 
 export function TokenomicsHero() {
@@ -18,9 +17,9 @@ export function TokenomicsHero() {
           </h1>
 
           <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
-            $EYES captures value from every fair launch on Eyes Open. Trading
-            activity routes fees to creators and a perpetual buy-and-burn engine
-            — platform growth directly reduces supply.
+            $EYES is the settlement token for Eyes Open. Trading activity routes
+            fees to creators and a documented buy-and-burn queue — platform mechanics
+            on-chain, not a promise of market price.
           </p>
 
           <p className="mt-4 font-mono-label text-muted-foreground">
@@ -59,10 +58,6 @@ export function TokenomicsCta() {
             <CtaButton href={ROUTES.home} variant="secondary">
               Back to Home
             </CtaButton>
-          </div>
-
-          <div className="relative mt-6 flex flex-col items-center gap-3">
-            <SocialLinks />
           </div>
         </div>
       </Container>

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { WiringBadge } from '@/components/app/AppShell'
 import { CtaButton } from '@/components/ui/CtaButton'
+import { getLaunchChain } from '@/lib/launch-chains/registry'
 import { ROUTES, STATUS, TOKENOMICS } from '@/lib/site-config'
 import { formatWindowCountdown } from '@/lib/launch-ranking'
 import { phaseLabel, type RankedLaunch } from '@/lib/launch-types'
@@ -71,9 +72,13 @@ function PhaseBadge({ launch }: { launch: RankedLaunch }) {
 
 function LaunchCard({ launch }: { launch: RankedLaunch }) {
   const countdown = formatWindowCountdown(launch.windowEndsInSec)
+  const chain = getLaunchChain(launch.chainKey)
 
   return (
-    <article className="group relative flex flex-col rounded-sm border border-border bg-surface p-5 transition-all hover:border-primary/40 hover:shadow-sm">
+    <Link
+      href={ROUTES.appLaunchDetail(launch.id)}
+      className="group relative flex flex-col rounded-sm border border-border bg-surface p-5 transition-all hover:border-primary/40 hover:shadow-sm"
+    >
       {launch.rankPosition <= 3 ? (
         <span className="absolute right-3 top-3 font-mono-label text-[0.55rem] text-primary">
           #{launch.rankPosition}
@@ -86,7 +91,9 @@ function LaunchCard({ launch }: { launch: RankedLaunch }) {
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-display font-bold text-foreground">{launch.name}</h3>
-          <p className="font-mono-label text-[0.58rem] text-muted-foreground">${launch.symbol}</p>
+          <p className="font-mono-label text-[0.58rem] text-muted-foreground">
+            ${launch.symbol} · {chain.shortLabel}
+          </p>
         </div>
         <PhaseBadge launch={launch} />
       </div>
@@ -137,7 +144,7 @@ function LaunchCard({ launch }: { launch: RankedLaunch }) {
       <p className="mt-3 font-mono text-[0.65rem] text-muted-foreground">
         {truncateAddress(launch.creator)}
       </p>
-    </article>
+    </Link>
   )
 }
 
@@ -160,7 +167,8 @@ function RankingsPanel({ rankings }: { rankings: RankedLaunch[] }) {
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-foreground">{r.name}</p>
               <p className="text-xs text-muted-foreground">
-                {formatUsd(r.volumeUsd24h)} · {r.trades24h} trades
+                {getLaunchChain(r.chainKey).shortLabel} · {formatUsd(r.volumeUsd24h)} ·{' '}
+                {r.trades24h} trades
               </p>
             </div>
             {r.isBoosted ? <Zap className="h-3.5 w-3.5 shrink-0 text-accent-glow" /> : null}
@@ -322,7 +330,7 @@ export function LaunchesDiscovery() {
       </div>
 
       <p className="text-center font-mono-label text-[0.58rem] text-muted-foreground">
-        {STATUS.network} · snapshot feed · on-chain indexer wiring next · boosts burn {`>`}80% $EYES
+        Live feed · boosts burn {`>`}80% $EYES · tier-gated alerts
       </p>
     </div>
   )

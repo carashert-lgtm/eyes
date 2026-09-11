@@ -59,6 +59,12 @@ const distributorBal = await client.readContract({
   args: [account.address],
 })
 
+const [ethBal, pendingNonce, latestNonce] = await Promise.all([
+  client.getBalance({ address: account.address }),
+  client.getTransactionCount({ address: account.address, blockTag: 'pending' }),
+  client.getTransactionCount({ address: account.address, blockTag: 'latest' }),
+])
+
 const treasuryBal = await client.readContract({
   address: token,
   abi: erc20Abi,
@@ -74,6 +80,10 @@ console.log(JSON.stringify({
   distributorMatchesTreasury: account.address.toLowerCase() === treasury.toLowerCase(),
   distributorBalanceEyes: formatUnits(distributorBal, 18),
   treasuryBalanceEyes: formatUnits(treasuryBal, 18),
+  ethBalance: formatUnits(ethBal, 18),
+  noncePending: pendingNonce,
+  nonceLatest: latestNonce,
+  pendingTxGap: pendingNonce - latestNonce,
 }, null, 2))
 
 if (account.address.toLowerCase() !== treasury.toLowerCase()) {

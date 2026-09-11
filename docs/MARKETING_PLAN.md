@@ -295,7 +295,7 @@ Pick **one primary milestone** for “launch day” — do not conflate these:
 - ❌ “Investment advice” or price targets
 - ❌ Paid shills without disclosure
 - ❌ Fake volume or manufactured “community” bots
-- ❌ Team allocation rumors — official model is **no team bucket** unless explicitly added later
+- ✅ **10% owner allocation** disclosed in tokenomics — do not imply “no insider bag”
 
 ### Operations
 - ❌ Launch mainnet before testnet soak + audit plan

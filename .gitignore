@@ -8,3 +8,5 @@ deployments/base-sepolia.env
 .env
 .env.*
 !.env.example
+target/
+deploy/devnet-keypair.json

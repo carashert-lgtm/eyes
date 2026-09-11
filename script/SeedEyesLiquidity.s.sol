@@ -14,9 +14,7 @@ import {console2} from "forge-std/console2.sol";
 /// @notice Seeds the platform $EYES/WETH pool on Uniswap V2 (required for buy & burn).
 contract SeedEyesLiquidity is EyesScriptBase {
     function run() external {
-        if (block.chainid == BaseSepoliaConfig.CHAIN_ID) {
-            _requireChain(BaseSepoliaConfig.CHAIN_ID);
-        }
+        _enforceSupportedChain();
 
         address eyesToken = _resolveAddress("EYES_TOKEN", "eyesToken");
         address dexRouter = _dexRouter();

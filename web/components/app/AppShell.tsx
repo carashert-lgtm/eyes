@@ -2,50 +2,52 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, Wallet } from 'lucide-react'
+import { Menu, X, User } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { EyeMark } from '@/components/ui/EyeMark'
 import { APP_NAV_LINKS, BRAND, ROUTES, STATUS } from '@/lib/site-config'
 import { cn } from '@/lib/utils'
-import { truncateAddress, useWallet } from '@/lib/wallet-context'
+import { useAppWallet } from '@/hooks/useAppWallet'
+function SignInChip({ className }: { className?: string }) {
+  const { signedIn, isConnected, accountEmail, walletUnlocked } = useAppWallet()
 
-function WalletConnectButton({ className }: { className?: string }) {
-  const { connected, address, connect, disconnect, canConnect } = useWallet()
-
-  if (connected && address) {
+  if (!signedIn) {
     return (
-      <button
-        type="button"
-        onClick={disconnect}
+      <Link
+        href={ROUTES.appProfile}
         className={cn(
-          'inline-flex min-h-11 items-center gap-2 rounded-sm border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/50',
+          'inline-flex min-h-11 items-center gap-2 rounded-sm border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-all hover:border-primary/70 hover:bg-primary/20',
           className,
         )}
       >
-        <span className="h-2 w-2 rounded-full bg-primary" />
-        {truncateAddress(address)}
-      </button>
+        <User className="h-4 w-4" />
+        Sign in
+      </Link>
     )
   }
 
   return (
-    <button
-      type="button"
-      onClick={connect}
-      disabled={!canConnect && !connected}
-      title={
-        canConnect
-          ? 'Demo connect (mock wallet until wagmi wired)'
-          : 'Wallet wiring pending'
-      }
+    <Link
+      href={ROUTES.appProfile}
       className={cn(
-        'inline-flex min-h-11 items-center gap-2 rounded-sm border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-all hover:border-primary/70 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex min-h-11 items-center gap-2 rounded-sm border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/50',
         className,
       )}
     >
-      <Wallet className="h-4 w-4" />
-      Connect Wallet
-    </button>
+      <span
+        className={cn(
+          'h-2 w-2 rounded-full',
+          isConnected ? 'bg-primary' : signedIn && !walletUnlocked ? 'bg-amber-500' : 'bg-primary',
+        )}
+      />
+      {isConnected
+        ? 'Eyes Wallet'
+        : signedIn && !walletUnlocked
+          ? 'Unlock wallet'
+          : signedIn
+            ? 'Eyes Wallet'
+            : accountEmail ?? 'Account'}
+    </Link>
   )
 }
 
@@ -96,10 +98,7 @@ export function AppTopBar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <span className="hidden rounded-sm border border-border bg-surface px-2.5 py-1.5 font-mono-label text-[0.58rem] text-muted-foreground sm:inline-flex">
-            {STATUS.networkDetail}
-          </span>
-          <WalletConnectButton className="hidden sm:inline-flex" />
+          <SignInChip className="hidden sm:inline-flex" />
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -123,11 +122,8 @@ export function AppTopBar() {
                 {link.label}
               </Link>
             ))}
-            <div className="mt-4 flex flex-col gap-3">
-              <span className="font-mono-label text-[0.58rem] text-muted-foreground">
-                {STATUS.networkDetail}
-              </span>
-              <WalletConnectButton className="w-full justify-center" />
+            <div className="mt-4">
+              <SignInChip className="w-full justify-center" />
             </div>
           </nav>
         </div>
@@ -139,8 +135,14 @@ export function AppTopBar() {
 export function AppDisclaimer() {
   return (
     <p className="border-t border-border py-6 text-center font-mono-label text-[0.58rem] leading-relaxed text-muted-foreground">
-      {STATUS.network} only · Mainnet after audit · Not financial advice · Verify
-      contracts on BaseScan
+      {STATUS.disclaimer} only · Not financial advice ·{' '}
+      <a href="/legal#trust" className="text-primary hover:underline">
+        Verify contracts
+      </a>{' '}
+      ·{' '}
+      <a href="/legal/risk-disclosure" className="text-primary hover:underline">
+        Risk disclosure
+      </a>
     </p>
   )
 }

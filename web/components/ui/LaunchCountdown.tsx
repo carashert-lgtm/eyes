@@ -20,7 +20,7 @@ function pad(n: number) {
   return n.toString().padStart(2, '0')
 }
 
-/** Glassmorphism launch countdown — hero's second focal point. */
+/** Display-only launch countdown — no actions when the timer reaches zero. */
 export function LaunchCountdown() {
   const targetMs = LAUNCH_END_ISO ? new Date(LAUNCH_END_ISO).getTime() : null
   const isValid = targetMs !== null && !Number.isNaN(targetMs)
@@ -42,12 +42,10 @@ export function LaunchCountdown() {
     return () => clearInterval(id)
   }, [isValid, targetMs])
 
-  // Shared glass shell.
   const shell =
     'relative mx-auto w-full max-w-2xl rounded-sm border border-primary/25 bg-card/70 px-6 py-8 text-center shadow-lg shadow-primary/5 backdrop-blur-md sm:px-10 sm:py-10'
   const innerGlow = { boxShadow: 'inset 0 0 40px -12px rgba(212,175,55,0.35)' }
 
-  // Waiting state — no fake zeros.
   if (!isValid) {
     return (
       <div className={shell} style={innerGlow}>
@@ -56,19 +54,21 @@ export function LaunchCountdown() {
             className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
             style={{ animation: 'pulse-dot 2.4s ease-in-out infinite' }}
           />
-          <span className="font-mono-label text-muted-foreground">
-            Public launch
-          </span>
+          <span className="font-mono-label text-muted-foreground">Launch window</span>
         </div>
         <p className="mt-4 font-display text-3xl font-extrabold tracking-tight text-balance text-foreground sm:text-5xl">
-          Countdown not started
+          Timer not configured
         </p>
-        <p className="mt-3 text-base text-muted-foreground">
-          Launch timer coming soon
-        </p>
+        <p className="mt-3 text-base text-muted-foreground">Set NEXT_PUBLIC_LAUNCH_END_ISO</p>
       </div>
     )
   }
+
+  const ended =
+    timeLeft.days === 0 &&
+    timeLeft.hours === 0 &&
+    timeLeft.minutes === 0 &&
+    timeLeft.seconds === 0
 
   const units: { label: string; value: number }[] = [
     { label: 'Days', value: timeLeft.days },
@@ -87,7 +87,9 @@ export function LaunchCountdown() {
             boxShadow: '0 0 8px #d4af37',
           }}
         />
-        <span className="font-mono-label text-primary">Public launch in</span>
+        <span className="font-mono-label text-primary">
+          {ended ? 'Launch window' : 'Launch in'}
+        </span>
       </div>
 
       <div className="mt-6 flex items-start justify-center gap-3 sm:gap-6">
@@ -101,14 +103,20 @@ export function LaunchCountdown() {
                 {u.label}
               </span>
             </div>
-            {i < units.length - 1 && (
+            {i < units.length - 1 ? (
               <span className="font-mono text-3xl font-light leading-none text-primary/40 sm:text-6xl lg:text-7xl">
                 :
               </span>
-            )}
+            ) : null}
           </div>
         ))}
       </div>
+
+      {ended ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Countdown complete — launch prep starts when we&apos;re ready.
+        </p>
+      ) : null}
     </div>
   )
 }

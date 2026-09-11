@@ -1,5 +1,8 @@
 import './load-env.js'
 import { logEnvHealth, logEnvSources } from './load-env.js'
+import { migrateRetentionLedger } from './retention-store.js'
+
+migrateRetentionLedger()
 import {
   Client,
   GatewayIntentBits,
@@ -13,6 +16,7 @@ import {
   enableDiscordInviteTracking,
   getUserByCode,
   getUserByDiscord,
+  getPresalePurchasesByWallet,
   grantLocked,
   grantUnlocked,
   isDiscordInviteTrackingEnabled,
@@ -46,6 +50,26 @@ import {
   listTeamActivationCodes,
   revokeTeamActivationCode,
 } from './team-codes.js'
+import {
+  clearModLogChannel,
+  getModLogChannelId,
+  handleProfanityFilter,
+  setModLogChannel,
+} from './moderation.js'
+import {
+  linkWalletDirect,
+  redeemWalletLinkCode,
+  unlinkUserWallet,
+  normalizeCode,
+} from './wallet-link.js'
+import {
+  queueDiscordSend,
+  executeDiscordSend,
+  listPendingDiscordSends,
+  getDiscordSend,
+  getDiscordSenderStatus,
+} from './discord-send.js'
+import { formatLpcStatus, lpcRequest } from './lpc.js'
 
 if (!config.token) {
   console.error('DISCORD_BOT_TOKEN required')
@@ -58,14 +82,19 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildModeration,
   ],
   partials: [Partials.GuildMember],
 })
 
 async function staffLog(content) {
   if (!config.staffLogChannelId) return
-  const ch = await client.channels.fetch(config.staffLogChannelId).catch(() => null)
-  if (ch?.isTextBased()) ch.send(content)
+  try {
+    const ch = await client.channels.fetch(config.staffLogChannelId).catch(() => null)
+    if (ch?.isTextBased()) await ch.send(content)
+  } catch (err) {
+    console.warn('staffLog failed (check bot can view/send in staff log channel):', err.message)
+  }
 }
 
 function parseUserArg(guild, arg) {
@@ -177,7 +206,7 @@ client.on('ready', async () => {
   console.log('Distributor: presale purchases + team !claim queue')
   logEnvSources()
   logEnvHealth()
-  console.log('Commands: !help · !claim · !presalesend · !linkwallet')
+  console.log('Commands: !help · !presalestatus · !claim · !presalesend · !linkwallet')
   exportSnapshot()
   // Webhook already listening (started before login for Railway healthcheck)
 
@@ -190,7 +219,7 @@ client.on('ready', async () => {
     if (!dist.ready) {
       console.error('!presalesend NOT ready:', dist.issues.join(' | '))
       await staffLog(
-        `⚠️ **!presalesend not ready**\n${dist.issues.map((i) => `· ${i}`).join('\n')}`,
+        `⚠️ **!presalesend not ready**\n${dist.issues.map((i) => `· ${i.split('\n')[0]}`).join('\n')}`,
       )
     }
   } catch (err) {
@@ -202,6 +231,15 @@ client.on('ready', async () => {
       const guild = await client.guilds.fetch(config.guildId)
       await refreshInviteCache(guild)
       console.log(`Invite cache loaded for ${guild.name}`)
+      await staffLog(
+        [
+          '✅ **Eyes Warden online**',
+          `Version \`${BOT_VERSION}\` · guild **${guild.name}**`,
+          'Everyone: `!help` · `!linkwallet` · `!presalestatus` · `!myref`',
+          'Owner: `!whoami` · `!sendstatus` · `!presalesend`',
+          'Music stays on **Bradley** → `/play` (slash, not `!`)',
+        ].join('\n'),
+      )
     } catch (err) {
       console.error('Failed to load invite cache — bot needs Manage Server permission', err)
     }
@@ -241,8 +279,28 @@ client.on('guildMemberAdd', async (member) => {
   }
 })
 
+function fmtPresaleStatus(p) {
+  const statusLabel =
+    p.status === 'sent'
+      ? 'sent ✓'
+      : p.status === 'sending'
+        ? 'sending…'
+        : p.status === 'failed'
+          ? 'failed ✗'
+          : 'queued'
+  return [
+    `#${p.id} · **${p.tierLabel ?? `Tier ${p.tierId}`}** · ${p.tokensOwed.toLocaleString()} $EYES`,
+    `${p.ethAmount} ETH · ${statusLabel}`,
+  ].join('\n')
+}
+
 client.on('messageCreate', async (message) => {
-  if (message.author.bot || !message.content.startsWith('!')) return
+  if (message.author.bot) return
+  if (config.guildId && message.guild?.id !== config.guildId) return
+
+  if (await handleProfanityFilter(message)) return
+
+  if (!message.content.startsWith('!')) return
 
   const args = message.content.slice(1).trim().split(/\s+/)
   const cmd = args.shift()?.toLowerCase()
@@ -591,18 +649,193 @@ client.on('messageCreate', async (message) => {
       }
 
       case 'linkwallet': {
-        const wallet = args[0]
-        if (!wallet?.startsWith('0x')) {
-          await message.reply('Usage: `!linkwallet 0x…`')
+        const arg = args[0]
+        if (!arg) {
+          await message.reply(
+            [
+              '**Link your wallet for presale status + bot sends**',
+              '1. Connect wallet on **eyesopen.to/app/profile**',
+              '2. Tap **Generate Discord link code**',
+              '3. Run `!linkwallet EYES-…` here',
+              '',
+              'Or direct: `!linkwallet 0xYourAddress`',
+            ].join('\n'),
+          )
           break
         }
-        db.prepare(
-          'UPDATE users SET wallet_address = ?, updated_at = ? WHERE discord_id = ?',
-        ).run(wallet, new Date().toISOString(), actor.id)
-        exportSnapshot()
-        await message.reply('Wallet linked ✓')
+        ensureUser(actor.id, actor.username)
+        try {
+          if (normalizeCode(arg) || arg.toUpperCase().startsWith('EYES-')) {
+            const { walletAddress, code } = redeemWalletLinkCode(actor.id, actor.username, arg)
+            await message.reply(`Wallet linked ✓ · \`${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}\` · code \`${code}\``)
+            await staffLog(`Wallet link · ${actor.username} · ${walletAddress}`)
+            break
+          }
+          if (!arg.startsWith('0x')) {
+            await message.reply('Usage: `!linkwallet EYES-…` or `!linkwallet 0x…`')
+            break
+          }
+          linkWalletDirect(actor.id, actor.username, arg)
+          await message.reply('Wallet linked ✓')
+          await staffLog(`Wallet link (direct) · ${actor.username} · ${arg}`)
+        } catch (err) {
+          await message.reply(`Link failed: ${err.message}`)
+        }
         break
       }
+
+      case 'mywallet': {
+        ensureUser(actor.id, actor.username)
+        const user = getUserByDiscord(actor.id)
+        if (!user?.wallet_address) {
+          await message.reply('No wallet linked. Use **eyesopen.to/app/profile** → Generate code → `!linkwallet EYES-…`')
+          break
+        }
+        await message.reply(`Linked wallet: \`${user.wallet_address}\``)
+        break
+      }
+
+      case 'unlinkwallet': {
+        unlinkUserWallet(actor.id)
+        await message.reply('Wallet unlinked from your Discord account.')
+        break
+      }
+
+      case 'setwallet': {
+        if (!isOwner(actor.id)) {
+          await message.reply('Owner only.')
+          break
+        }
+        const target = parseUserArg(guild, args[0])
+        const wallet = args[1]
+        if (!target || !wallet?.startsWith('0x')) {
+          await message.reply('Usage: `!setwallet @user 0x…`')
+          break
+        }
+        linkWalletDirect(target.id, target.username, wallet)
+        await message.reply(`Set wallet for **${target.username}**`)
+        await staffLog(`Owner setwallet · ${actor.username} → ${target.username} · ${wallet}`)
+        break
+      }
+
+      case 'walletof': {
+        if (!isOwner(actor.id)) {
+          await message.reply('Owner only.')
+          break
+        }
+        const target = parseUserArg(guild, args[0])
+        if (!target) {
+          await message.reply('Usage: `!walletof @user`')
+          break
+        }
+        const user = getUserByDiscord(target.id)
+        await message.reply(
+          user?.wallet_address
+            ? `**${target.username}** → \`${user.wallet_address}\``
+            : `**${target.username}** has no linked wallet.`,
+        )
+        break
+      }
+
+      case 'sendeyes':
+      case 'sendtoken': {
+        if (!isOwner(actor.id)) {
+          await message.reply('Owner only.')
+          break
+        }
+        const sub = args[0]?.toLowerCase()
+        if (sub === 'confirm' && args[1]) {
+          const id = Number(args[1])
+          if (!Number.isFinite(id)) {
+            await message.reply('Usage: `!sendeyes confirm ID`')
+            break
+          }
+          try {
+            const result = await executeDiscordSend(id, { force: true })
+            await message.reply(`Sent ✓ #${id} · tx \`${result.txHash}\``)
+            await staffLog(`sendeyes confirm #${id} · ${result.txHash} · by ${actor.username}`)
+          } catch (err) {
+            await message.reply(`Send failed: ${err.message}`)
+          }
+          break
+        }
+        if (sub === 'dry' && args[1]) {
+          const id = Number(args[1])
+          try {
+            const result = await executeDiscordSend(id, { dryRun: true, force: true })
+            await message.reply(
+              `Dry run #${id} · ${result.amount ?? result.send?.amount} $EYES → \`${result.to ?? result.send?.walletAddress}\``,
+            )
+          } catch (err) {
+            await message.reply(`Dry run failed: ${err.message}`)
+          }
+          break
+        }
+        if (sub === 'pending' || sub === 'list') {
+          const pending = listPendingDiscordSends(15)
+          if (!pending.length) {
+            await message.reply('No pending Discord sends.')
+            break
+          }
+          const lines = pending.map(
+            (p) => `#${p.id} · ${p.status} · ${p.amount.toLocaleString()} → \`${p.walletAddress.slice(0, 8)}…\``,
+          )
+          await message.reply(['Pending sends:', ...lines].join('\n').slice(0, 1900))
+          break
+        }
+
+        const target = parseUserArg(guild, args[0])
+        const amount = parseTokenAmount(args[1])
+        const tokenArg = cmd === 'sendtoken' ? args[2] : null
+        if (!target || !Number.isFinite(amount) || amount <= 0) {
+          await message.reply(
+            cmd === 'sendtoken'
+              ? 'Usage: `!sendtoken @user AMOUNT 0xToken` · `!sendeyes pending`'
+              : 'Usage: `!sendeyes @user AMOUNT` · confirm: `!sendeyes confirm ID`',
+          )
+          break
+        }
+        const user = getUserByDiscord(target.id)
+        if (!user?.wallet_address) {
+          await message.reply(`${target.username} has no linked wallet.`)
+          break
+        }
+        const tokenAddress =
+          tokenArg?.startsWith('0x') ? tokenArg : (process.env.EYES_TOKEN_ADDRESS ?? '')
+        if (!tokenAddress) {
+          await message.reply('EYES_TOKEN_ADDRESS not configured.')
+          break
+        }
+        const { id, status } = queueDiscordSend({
+          discordId: target.id,
+          walletAddress: user.wallet_address,
+          tokenAddress,
+          amount,
+          actorId: actor.id,
+          note: `${cmd} by ${actor.username}`,
+        })
+        if (status === 'awaiting_confirm') {
+          await message.reply(
+            `Large send queued **#${id}** · ${amount.toLocaleString()} $EYES → ${target.username}\nConfirm: \`!sendeyes confirm ${id}\``,
+          )
+          break
+        }
+        try {
+          const result = await executeDiscordSend(id)
+          if (result.dryRun) {
+            await message.reply(`Dry run #${id} — set DISCORD_SEND_DRY_RUN=false to send live.`)
+            break
+          }
+          await message.reply(
+            `Sent ✓ **${amount.toLocaleString()}** $EYES → ${target.username} · \`${result.txHash?.slice(0, 10)}…\``,
+          )
+          await staffLog(`sendeyes #${id} · ${amount} → ${user.wallet_address} · ${result.txHash}`)
+        } catch (err) {
+          await message.reply(`Queued #${id} but send failed: ${err.message}`)
+        }
+        break
+      }
+
 
       case 'claim': {
         const amount = parseTokenAmount(args[0])
@@ -631,15 +864,41 @@ client.on('messageCreate', async (message) => {
           await message.reply('Owner only.')
           break
         }
+        const lookupId = Number(args[0])
+        if (args[0] && Number.isFinite(lookupId)) {
+          const row = getDiscordSend(lookupId)
+          if (!row) {
+            await message.reply(`Send #${lookupId} not found.`)
+            break
+          }
+          await message.reply(
+            [
+              `#${row.id} · **${row.status}**`,
+              `Amount: ${row.amount.toLocaleString()}`,
+              `Wallet: \`${row.walletAddress}\``,
+              row.txHash ? `Tx: \`${row.txHash}\`` : '',
+              row.error ? `Error: ${row.error}` : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          )
+          break
+        }
         const pending = getPendingSendStats()
         const dist = await getDistributorStatus()
+        const manual = await getDiscordSenderStatus()
         await message.reply(
           [
-            `Pending: **${pending.presale}** presale · **${pending.team}** team`,
+            `Pending: **${pending.presale}** presale · **${pending.team}** team · **${manual.pending}** manual`,
+            `Chain: **${dist.chainId}** (${dist.rpcMode ?? '?'}) · token \`${dist.tokenAddress ? `${dist.tokenAddress.slice(0, 8)}…` : 'unset'}\``,
             `Treasury key: **${dist.matchesTreasury ? 'ok ✓' : 'mismatch ✗'}**`,
             `Balance: **${dist.balanceEyes ?? '?'}** $EYES · **${dist.balanceEth ?? '?'}** ETH`,
+            `Manual sender: \`${manual.senderAddress?.slice(0, 8) ?? '?'}…\` · ${manual.balanceEyes ?? '?'} $EYES`,
             dist.ready ? '✅ Ready — `!presalesend run`' : `❌ ${dist.issues.join(' · ')}`,
-          ].join('\n'),
+            manual.dryRun ? '⚠️ DISCORD_SEND_DRY_RUN=true' : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
         )
         break
       }
@@ -763,6 +1022,142 @@ client.on('messageCreate', async (message) => {
 
       case 'teamcode': {
         await handleTeamCodeCommand(message, args, actor, guild)
+        break
+      }
+
+      case 'presalestatus':
+      case 'mypresale': {
+        const user = getUserByDiscord(actor.id)
+        let wallet = user.wallet_address
+        if (args[0]?.startsWith('0x')) {
+          if (!isOwner(actor.id)) {
+            await message.reply('Owner only when checking another wallet.')
+            break
+          }
+          wallet = args[0]
+        }
+        if (!wallet?.startsWith('0x')) {
+          await message.reply(
+            'Link your wallet first: `!linkwallet 0x…`\nPresale status uses the wallet you registered on **eyesopen.to/presale**.',
+          )
+          break
+        }
+        const purchases = getPresalePurchasesByWallet(wallet)
+        if (!purchases.length) {
+          await message.reply(
+            'No presale registration found for your linked wallet.\nContribute at **eyesopen.to/presale**, then register your payment wallet on the site.',
+          )
+          break
+        }
+        const lines = purchases.map(fmtPresaleStatus)
+        await message.reply(
+          [
+            `Presale · ${purchases.length} registration(s)`,
+            ...lines,
+            purchases.some((p) => p.status !== 'sent')
+              ? '\nQueued sends run on staff `!presalesend run`.'
+              : '',
+          ]
+            .filter(Boolean)
+            .join('\n')
+            .slice(0, 1900),
+        )
+        break
+      }
+
+      case 'setmodlog': {
+        if (!isOwner(actor.id)) {
+          await message.reply('Owner only.')
+          break
+        }
+        const channel = message.mentions.channels.first()
+        if (!channel?.isTextBased()) {
+          await message.reply('Usage: `!setmodlog #channel`')
+          break
+        }
+        setModLogChannel(guild.id, channel.id)
+        await message.reply(`Mod log channel → ${channel}`)
+        break
+      }
+
+      case 'modlogstatus': {
+        if (!isOwner(actor.id)) {
+          await message.reply('Owner only.')
+          break
+        }
+        const logId = getModLogChannelId(guild.id)
+        if (!logId) {
+          await message.reply('No mod log channel set. Use `!setmodlog #channel`.')
+          break
+        }
+        const ch = await guild.channels.fetch(logId).catch(() => null)
+        await message.reply(ch ? `Mod log: ${ch}` : 'Mod log channel missing — set again with `!setmodlog`.')
+        break
+      }
+
+      case 'xlist': {
+        const data = await lpcRequest('/warden/list', { discordId: actor.id })
+        const rows = (data.tokens || []).map(
+          (t) =>
+            `$${t.ticker} — ${t.linked ? 'linked' : 'not linked'}, auto ${t.auto ? 'on' : 'off'}`,
+        )
+        await message.reply(
+          rows.length
+            ? `**${data.seat || 'Your seat'}**\n${rows.join('\n')}`
+            : 'No X accounts on your Launchpad Command seat.',
+        )
+        break
+      }
+
+      case 'xstatus': {
+        const data = await lpcRequest(`/warden/status?ticker=${encodeURIComponent(args[0] || '')}`, {
+          discordId: actor.id,
+        })
+        await message.reply(formatLpcStatus(data))
+        break
+      }
+
+      case 'xcheck': {
+        const data = await lpcRequest(`/warden/check?ticker=${encodeURIComponent(args[0] || '')}`, {
+          discordId: actor.id,
+        })
+        const head = data.ok ? 'OK' : 'ISSUES'
+        const body = (data.lines || []).join('\n')
+        await message.reply(`${head}\n${body}`.slice(0, 1800))
+        break
+      }
+
+      case 'xpost': {
+        await message.reply(`Forcing one auto post${args[0] ? ` for $${args[0]}` : ''}…`)
+        const posted = await lpcRequest('/warden/post', {
+          method: 'POST',
+          body: { ticker: args[0] || '' },
+          discordId: actor.id,
+        })
+        await message.reply(`Posted: ${(posted.body || '').slice(0, 200)}`)
+        break
+      }
+
+      case 'xboost': {
+        await lpcRequest('/warden/boost', {
+          method: 'POST',
+          body: { ticker: args[0] || '' },
+          discordId: actor.id,
+        })
+        const status = await lpcRequest(`/warden/status?ticker=${encodeURIComponent(args[0] || '')}`, {
+          discordId: actor.id,
+        })
+        await message.reply(formatLpcStatus(status))
+        break
+      }
+
+      case 'clearmodlog': {
+        if (!isOwner(actor.id)) {
+          await message.reply('Owner only.')
+          break
+        }
+        clearModLogChannel(guild.id)
+        await message.reply('Mod log channel cleared (falls back to staff log env if set).')
         break
       }
 

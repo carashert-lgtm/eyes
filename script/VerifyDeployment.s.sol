@@ -15,6 +15,9 @@ import {console2} from "forge-std/console2.sol";
 contract VerifyDeployment is EyesScriptBase {
     function run() external view {
         _requireDeploymentFile();
+        if (_isLocalAnvil()) {
+            _preflightAnvilDeployment();
+        }
 
         address eyesToken = _readDeployment("eyesToken");
         address feeCollector = _readDeployment("feeCollector");

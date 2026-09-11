@@ -1,10 +1,9 @@
 import { Section, Eyebrow } from '@/components/ui/Section'
-
-const TILES = [
-  { label: 'Fixed supply', value: '1,000,000,000', unit: '$EYES' },
-  { label: 'Minting', value: 'None', unit: 'after deploy' },
-  { label: 'Deflation', value: 'On-chain', unit: 'buy & burn' },
-]
+import {
+  EYES_TOTAL_SUPPLY,
+  FOUNDER_SHARE,
+  formatTokensFull,
+} from '@/lib/founder-share-config'
 
 const FLYWHEEL = [
   'A new fair launch goes live on the pad and opens for trading.',
@@ -14,6 +13,25 @@ const FLYWHEEL = [
 ]
 
 export function Token() {
+  const tiles = [
+    {
+      label: 'Fixed supply',
+      value: formatTokensFull(EYES_TOTAL_SUPPLY),
+      unit: '$EYES',
+      compact: true,
+    },
+    {
+      label: 'Owner allocation',
+      value: `${FOUNDER_SHARE.totalPercent}%`,
+      unit: `${formatTokensFull(FOUNDER_SHARE.totalTokens)} $EYES`,
+    },
+    {
+      label: 'Deflation',
+      value: 'On-chain',
+      unit: 'buy & burn',
+    },
+  ]
+
   return (
     <Section id="token">
       <div className="grid gap-14 lg:grid-cols-2 lg:gap-16">
@@ -21,7 +39,7 @@ export function Token() {
         <div>
           <Eyebrow>$EYES token</Eyebrow>
           <h2 className="mt-5 font-display text-3xl font-bold tracking-tight text-foreground text-balance sm:text-4xl">
-            The platform token that captures launch volume.
+            The platform token tied to launch activity.
           </h2>
           <p className="mt-5 text-base leading-relaxed text-muted-foreground">
             $EYES is the settlement layer for Eyes Open — every fair launch on
@@ -29,7 +47,7 @@ export function Token() {
           </p>
 
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            {TILES.map((t) => (
+            {tiles.map((t) => (
               <div
                 key={t.label}
                 className="rounded-sm border border-border bg-surface p-5"
@@ -37,12 +55,16 @@ export function Token() {
                 <div className="font-mono-label text-muted-foreground">
                   {t.label}
                 </div>
-                <div className="mt-3 font-display text-xl font-bold text-foreground">
+                <div
+                  className={
+                    t.compact
+                      ? 'mt-3 font-display text-lg font-bold tabular-nums tracking-tight text-foreground sm:text-xl'
+                      : 'mt-3 font-display text-xl font-bold text-foreground'
+                  }
+                >
                   {t.value}
                 </div>
-                <div className="mt-1 font-mono text-xs text-primary">
-                  {t.unit}
-                </div>
+                <div className="mt-1 font-mono text-xs text-primary">{t.unit}</div>
               </div>
             ))}
           </div>

@@ -2,12 +2,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * Premium gold $EYES medallion — hero focal point.
- * 3D CSS: stacked rim slices fake thickness, two faces, slow Y-axis spin
- * with a subtle float. Surrounded by a warm gold glow, slow orbital rings,
- * and faint light streaks passing behind for a high-end Bitcoin-glory feel.
- *
- * Size is controlled via the `size` prop (coin diameter in px). The whole
- * stage scales around it.
+ * 3D CSS: stacked rim slices + two faces, slow Y-axis spin with float.
  */
 export function SpinningCoin({
   className,
@@ -16,8 +11,10 @@ export function SpinningCoin({
   className?: string
   size?: number
 }) {
-  // Rim slices create the illusion of coin thickness while spinning.
   const rimSlices = Array.from({ length: 22 })
+  const rimStep = 1.2
+  const rimHalf = (rimSlices.length / 2) * rimStep
+  const faceHalf = rimHalf + 3
   const stage = size * 1.9
 
   return (
@@ -26,7 +23,6 @@ export function SpinningCoin({
       style={{ width: stage, height: stage, maxWidth: '100%' }}
       aria-hidden="true"
     >
-      {/* Radial glow pulse behind coin */}
       <div
         className="pointer-events-none absolute rounded-full blur-3xl"
         style={{
@@ -38,7 +34,6 @@ export function SpinningCoin({
         }}
       />
 
-      {/* Faint light streaks passing behind the coin */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="absolute left-0 top-[38%] h-px w-full"
@@ -58,7 +53,6 @@ export function SpinningCoin({
         />
       </div>
 
-      {/* Slow orbital rings */}
       <div
         className="pointer-events-none absolute rounded-full border border-primary/25"
         style={{
@@ -79,7 +73,6 @@ export function SpinningCoin({
         }}
       />
 
-      {/* Ground shadow beneath coin */}
       <div
         className="pointer-events-none absolute rounded-full blur-2xl"
         style={{
@@ -90,26 +83,23 @@ export function SpinningCoin({
         }}
       />
 
-      {/* The coin */}
-      <div
-        style={{ perspective: '1200px', animation: 'coin-float 6s ease-in-out infinite' }}
-      >
+      <div style={{ perspective: '1200px', animation: 'coin-float 6s ease-in-out infinite' }}>
         <div
           className="relative"
           style={{
             width: size,
             height: size,
             transformStyle: 'preserve-3d',
+            WebkitTransformStyle: 'preserve-3d',
             animation: 'coin-spin 10s linear infinite',
           }}
         >
-          {/* Coin edge / thickness */}
           {rimSlices.map((_, i) => (
             <div
               key={i}
               className="absolute inset-0 rounded-full"
               style={{
-                transform: `translateZ(${(i - rimSlices.length / 2) * 1.2}px)`,
+                transform: `translateZ(${(i - rimSlices.length / 2) * rimStep}px)`,
                 background:
                   i % 2 === 0
                     ? 'radial-gradient(circle at 50% 40%, #b8860b, #7a5a09)'
@@ -119,10 +109,8 @@ export function SpinningCoin({
             />
           ))}
 
-          {/* Front face */}
-          <CoinFace z={rimSlices.length / 2 + 1} size={size} />
-          {/* Back face (mirrored) */}
-          <CoinFace z={-(rimSlices.length / 2 + 1)} size={size} mirrored />
+          <CoinFace half={faceHalf} size={size} side="front" />
+          <CoinFace half={faceHalf} size={size} side="back" />
         </div>
       </div>
     </div>
@@ -130,43 +118,46 @@ export function SpinningCoin({
 }
 
 function CoinFace({
-  z,
+  half,
   size,
-  mirrored,
+  side,
 }: {
-  z: number
+  half: number
   size: number
-  mirrored?: boolean
+  side: 'front' | 'back'
 }) {
+  const isBack = side === 'back'
+
   return (
     <div
       className="absolute inset-0 rounded-full"
       style={{
-        transform: `translateZ(${z}px)${mirrored ? ' rotateY(180deg)' : ''}`,
+        transform: isBack
+          ? `rotateY(180deg) translateZ(${half}px)`
+          : `translateZ(${half}px)`,
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
         background:
           'radial-gradient(circle at 32% 26%, #fdf3cf 0%, #f2d97a 20%, #e6bd3f 44%, #c9a227 68%, #a97f12 100%)',
         boxShadow:
           'inset 0 0 0 6px rgba(180,131,9,0.55), inset 0 0 34px rgba(120,85,6,0.4), 0 14px 40px rgba(120,90,10,0.35)',
       }}
     >
-      {/* Specular highlight sweep */}
       <div
         className="absolute inset-0 rounded-full"
         style={{
           background:
-            'linear-gradient(125deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0) 34%, rgba(255,255,255,0) 66%, rgba(255,255,255,0.25) 100%)',
+            'linear-gradient(125deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 34%, rgba(255,255,255,0) 66%, rgba(255,255,255,0.2) 100%)',
           mixBlendMode: 'screen',
+          pointerEvents: 'none',
         }}
       />
-      {/* Bright rim light */}
       <div
         className="absolute inset-[7px] rounded-full"
-        style={{ boxShadow: 'inset 0 0 0 1px rgba(255,240,190,0.85)' }}
+        style={{ boxShadow: 'inset 0 0 0 1px rgba(255,240,190,0.85)', pointerEvents: 'none' }}
       />
-      {/* Beveled inner ridge */}
       <div className="absolute inset-[16px] rounded-full border border-[#8b6914]/45" />
 
-      {/* Face content */}
       <div className="absolute inset-0 grid place-items-center">
         <div className="flex flex-col items-center gap-1">
           <span

@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -10,6 +11,7 @@ export const config = {
   guildId: process.env.DISCORD_GUILD_ID ?? '',
   ownerIds: (process.env.DISCORD_OWNER_IDS ?? '').split(',').filter(Boolean),
   staffLogChannelId: process.env.DISCORD_STAFF_LOG_CHANNEL_ID ?? '',
+  launchesChannelId: process.env.DISCORD_LAUNCHES_CHANNEL_ID ?? '',
   siteUrl: process.env.SITE_URL ?? 'https://www.eyesopen.to',
   snapshotPath:
     process.env.SNAPSHOT_PATH ??
@@ -18,7 +20,7 @@ export const config = {
     process.env.WEB_SNAPSHOT_PATH ??
     path.join(__dirname, '../../../web/data/platform-snapshot.json'),
   dbPath: process.env.DB_PATH ?? path.join(__dirname, '../data/platform.db'),
-  teamPoolTokens: Number(process.env.TEAM_POOL_TOKENS ?? '120000000'),
+  teamPoolTokens: Number(process.env.TEAM_POOL_TOKENS ?? '100000000'),
   presaleTokenCap: Number(process.env.PRESALE_TOKEN_CAP ?? '200000000'),
   rewards: {
     discordInvite: Number(process.env.REFERRAL_REWARD_DISCORD ?? '500'),
@@ -93,6 +95,22 @@ db.exec(`
     distribution_tx_hash TEXT,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS app_accounts (
+    id TEXT PRIMARY KEY,
+    google_id TEXT UNIQUE,
+    email TEXT NOT NULL UNIQUE,
+    name TEXT,
+    image TEXT,
+    wallet_address TEXT,
+    discord_id TEXT,
+    email_launches INTEGER DEFAULT 1,
+    email_presale INTEGER DEFAULT 1,
+    email_season INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_app_accounts_wallet ON app_accounts(wallet_address);
+  CREATE INDEX IF NOT EXISTS idx_app_accounts_discord ON app_accounts(discord_id);
 `)
 
 function migrateDb() {
@@ -104,7 +122,197 @@ function migrateDb() {
   }
 }
 
+function migrateWalletFeatures() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wallet_link_codes (
+      code TEXT PRIMARY KEY,
+      wallet_address TEXT NOT NULL,
+      discord_id TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_wallet_link_wallet ON wallet_link_codes(wallet_address);
+    CREATE TABLE IF NOT EXISTS discord_token_sends (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      discord_id TEXT NOT NULL,
+      wallet_address TEXT NOT NULL,
+      token_address TEXT NOT NULL,
+      amount REAL NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      actor_id TEXT NOT NULL,
+      note TEXT,
+      tx_hash TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_discord_sends_status ON discord_token_sends(status);
+  `)
+}
+
+function migrateEyesAccountAuth() {
+  const cols = db.prepare('PRAGMA table_info(app_accounts)').all().map((c) => c.name)
+  const addCol = (name, ddl) => {
+    if (!cols.includes(name)) db.exec(`ALTER TABLE app_accounts ADD COLUMN ${ddl}`)
+  }
+  addCol('password_hash', 'password_hash TEXT')
+  addCol('wallet_enc_salt', 'wallet_enc_salt TEXT')
+  addCol('wallet_enc_iv', 'wallet_enc_iv TEXT')
+  addCol('wallet_enc_ciphertext', 'wallet_enc_ciphertext TEXT')
+  addCol('wallet_enc_version', 'wallet_enc_version INTEGER DEFAULT 1')
+  addCol('solana_address', 'solana_address TEXT')
+}
+
+function migrateLaunchMetadata() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS launch_metadata (
+      launch_id INTEGER PRIMARY KEY,
+      token_address TEXT NOT NULL UNIQUE,
+      pair_address TEXT,
+      name TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      description TEXT,
+      website TEXT,
+      twitter TEXT,
+      telegram TEXT,
+      creator TEXT NOT NULL,
+      deploy_tx_hash TEXT,
+      seed_tx_hash TEXT,
+      fomo_url TEXT NOT NULL,
+      registered_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_launch_metadata_token ON launch_metadata(token_address);
+  `)
+  const cols = db.prepare('PRAGMA table_info(launch_metadata)').all()
+  const hasChainKey = cols.some((c) => c.name === 'chain_key')
+  if (!hasChainKey) {
+    db.exec(`ALTER TABLE launch_metadata ADD COLUMN chain_key TEXT NOT NULL DEFAULT 'base'`)
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_launch_metadata_chain ON launch_metadata(chain_key)`)
+}
+
+function migrateBoostNotifications() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS boost_notifications (
+      tx_hash TEXT PRIMARY KEY,
+      package_id TEXT NOT NULL,
+      launch_id TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `)
+}
+
+function migrateAccountSettings() {
+  const cols = db.prepare('PRAGMA table_info(app_accounts)').all().map((c) => c.name)
+  const addCol = (name, ddl) => {
+    if (!cols.includes(name)) db.exec(`ALTER TABLE app_accounts ADD COLUMN ${ddl}`)
+  }
+  addCol('default_launch_chain', "default_launch_chain TEXT DEFAULT 'base'")
+  addCol('launch_webhook_url', 'launch_webhook_url TEXT')
+  addCol('launch_webhook_secret', 'launch_webhook_secret TEXT')
+  addCol('public_creator_profile', 'public_creator_profile INTEGER DEFAULT 1')
+  addCol('webhook_filter_chains', 'webhook_filter_chains TEXT')
+  addCol('webhook_only_mine', 'webhook_only_mine INTEGER DEFAULT 0')
+  addCol('webhook_events', 'webhook_events TEXT')
+  addCol('wallet_auto_lock_minutes', 'wallet_auto_lock_minutes INTEGER DEFAULT 15')
+  addCol('discord_dm_launches', 'discord_dm_launches INTEGER DEFAULT 0')
+  addCol('discord_dm_presale', 'discord_dm_presale INTEGER DEFAULT 0')
+  addCol('discord_dm_season', 'discord_dm_season INTEGER DEFAULT 0')
+}
+
+function migrateApiKeys() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      name TEXT NOT NULL,
+      key_prefix TEXT NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      scopes TEXT NOT NULL DEFAULT 'launches:read',
+      created_at TEXT NOT NULL,
+      last_used_at TEXT,
+      revoked_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_api_keys_account ON api_keys(account_id);
+    CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+  `)
+  const cols = db.prepare('PRAGMA table_info(api_keys)').all().map((c) => c.name)
+  const addCol = (name, ddl) => {
+    if (!cols.includes(name)) db.exec(`ALTER TABLE api_keys ADD COLUMN ${ddl}`)
+  }
+  addCol('tier', "tier TEXT DEFAULT 'free'")
+  addCol('kind', "kind TEXT DEFAULT 'personal'")
+  addCol('team_id', 'team_id TEXT')
+  addCol('requests_today', 'requests_today INTEGER DEFAULT 0')
+  addCol('requests_day_key', 'requests_day_key TEXT')
+  addCol('overage_tokens_burned', 'overage_tokens_burned INTEGER DEFAULT 0')
+}
+
+function migrateApiUsage() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS api_usage_daily (
+      key_id TEXT NOT NULL,
+      day TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (key_id, day)
+    );
+    CREATE INDEX IF NOT EXISTS idx_api_usage_key ON api_usage_daily(key_id);
+  `)
+}
+
+function migratePasswordReset() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token_hash TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_tokens(email);
+  `)
+}
+
+function migrateOAuthApps() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS oauth_apps (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      client_id TEXT NOT NULL UNIQUE,
+      client_secret_hash TEXT NOT NULL,
+      client_prefix TEXT NOT NULL,
+      redirect_uris TEXT NOT NULL,
+      scopes TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      revoked_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS oauth_codes (
+      code_hash TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      redirect_uri TEXT NOT NULL,
+      scopes TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_oauth_apps_account ON oauth_apps(account_id);
+  `)
+}
+
 migrateDb()
+migrateWalletFeatures()
+migrateEyesAccountAuth()
+migrateLaunchMetadata()
+migrateBoostNotifications()
+migrateAccountSettings()
+migrateApiKeys()
+migrateApiUsage()
+migratePasswordReset()
+migrateOAuthApps()
 
 function randomCode() {
   return Math.random().toString(36).slice(2, 10).toUpperCase()
@@ -478,6 +686,21 @@ export function getPresaleById(id) {
   return mapPresaleRow(row)
 }
 
+/** All presale rows for a wallet (payer or receive address). */
+export function getPresalePurchasesByWallet(wallet) {
+  const addr = wallet.trim().toLowerCase()
+  if (!addr.startsWith('0x') || addr.length < 10) return []
+  const rows = db
+    .prepare(
+      `SELECT * FROM presale_purchases
+       WHERE LOWER(receive_address) = ? OR LOWER(payer_address) = ?
+       ORDER BY created_at DESC
+       LIMIT 10`,
+    )
+    .all(addr, addr)
+  return rows.map(mapPresaleRow)
+}
+
 /** Lock a row for outbound send — prevents double-send if !presalesend run twice. */
 export function claimPresaleForSend(id) {
   const claim = db.transaction(() => {
@@ -739,4 +962,868 @@ export function markTeamClaimFailed(id, reason) {
     logAudit('team_claim_failed', row.discord_id, String(id), row.tokens_amount, reason)
   })()
   exportSnapshot()
+}
+
+function mapAppAccountRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    googleId: row.google_id,
+    email: row.email,
+    name: row.name,
+    image: row.image,
+    walletAddress: row.wallet_address,
+    solanaAddress: row.solana_address ?? null,
+    discordId: row.discord_id,
+    emailAlerts: {
+      launches: Boolean(row.email_launches),
+      presale: Boolean(row.email_presale),
+      season: Boolean(row.email_season),
+    },
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function upsertAppAccount({ googleId, email, name, image }) {
+  const now = new Date().toISOString()
+  const existing = db
+    .prepare('SELECT * FROM app_accounts WHERE google_id = ?')
+    .get(googleId)
+
+  if (existing) {
+    db.prepare(
+      `UPDATE app_accounts SET email = ?, name = ?, image = ?, updated_at = ? WHERE google_id = ?`,
+    ).run(email.toLowerCase(), name, image, now, googleId)
+    logAudit('account_upsert', googleId, email, null, 'update')
+    return mapAppAccountRow(
+      db.prepare('SELECT * FROM app_accounts WHERE google_id = ?').get(googleId),
+    )
+  }
+
+  const byEmail = db
+    .prepare('SELECT * FROM app_accounts WHERE email = ?')
+    .get(email.toLowerCase())
+  if (byEmail) {
+    db.prepare(
+      `UPDATE app_accounts SET google_id = ?, name = ?, image = ?, updated_at = ? WHERE email = ?`,
+    ).run(googleId, name, image, now, email.toLowerCase())
+    logAudit('account_upsert', googleId, email, null, 'email_merge')
+    return mapAppAccountRow(
+      db.prepare('SELECT * FROM app_accounts WHERE google_id = ?').get(googleId),
+    )
+  }
+
+  const id = randomUUID()
+  db.prepare(
+    `INSERT INTO app_accounts (
+      id, google_id, email, name, image, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, googleId, email.toLowerCase(), name, image, now, now)
+  logAudit('account_upsert', googleId, email, null, 'create')
+  return mapAppAccountRow(db.prepare('SELECT * FROM app_accounts WHERE google_id = ?').get(googleId))
+}
+
+export function getAppAccountByGoogleId(googleId) {
+  return mapAppAccountRow(
+    db.prepare('SELECT * FROM app_accounts WHERE google_id = ?').get(googleId),
+  )
+}
+
+export function getAppAccountByEmail(email) {
+  return mapAppAccountRow(
+    db.prepare('SELECT * FROM app_accounts WHERE email = ?').get(email.toLowerCase()),
+  )
+}
+
+export function subscribeEmailAccount(email) {
+  const normalized = email.toLowerCase()
+  const existing = getAppAccountByEmail(normalized)
+  if (existing) return existing
+
+  const now = new Date().toISOString()
+  const id = randomUUID()
+  db.prepare(
+    `INSERT INTO app_accounts (
+      id, google_id, email, name, image, created_at, updated_at
+    ) VALUES (?, NULL, ?, NULL, NULL, ?, ?)`,
+  ).run(id, normalized, now, now)
+  logAudit('account_subscribe', normalized, null, null, 'email_only')
+  return getAppAccountByEmail(normalized)
+}
+
+export function linkAppAccount({ googleId, email, wallet, discordId }) {
+  const account = googleId
+    ? getAppAccountByGoogleId(googleId)
+    : email
+      ? getAppAccountByEmail(email)
+      : null
+  if (!account) throw new Error('Account not found')
+
+  const now = new Date().toISOString()
+  const walletNorm = wallet ? wallet.toLowerCase() : account.walletAddress
+  const discordNorm = discordId ?? account.discordId
+
+  db.prepare(
+    `UPDATE app_accounts SET wallet_address = ?, discord_id = ?, updated_at = ? WHERE id = ?`,
+  ).run(walletNorm, discordNorm, now, account.id)
+
+  if (walletNorm && discordNorm) {
+    const teamUser = getUserByDiscord(discordNorm)
+    if (teamUser && !teamUser.wallet_address) {
+      db.prepare(
+        'UPDATE users SET wallet_address = ?, updated_at = ? WHERE discord_id = ?',
+      ).run(walletNorm, now, discordNorm)
+      exportSnapshot()
+    }
+  }
+
+  if (walletNorm && !discordNorm) {
+    const byWallet = db
+      .prepare('SELECT * FROM users WHERE wallet_address = ?')
+      .get(walletNorm)
+    if (byWallet) {
+      db.prepare(
+        'UPDATE app_accounts SET discord_id = ?, updated_at = ? WHERE id = ?',
+      ).run(byWallet.discord_id, now, account.id)
+    }
+  }
+
+  logAudit('account_link', account.googleId ?? account.email, walletNorm, null, discordNorm)
+  return googleId
+    ? getAppAccountByGoogleId(googleId)
+    : getAppAccountByEmail(account.email)
+}
+
+export function updateAppAccountPreferences(identity, emailAlerts) {
+  const account = identity.googleId
+    ? getAppAccountByGoogleId(identity.googleId)
+    : identity.email
+      ? getAppAccountByEmail(identity.email)
+      : null
+  if (!account) throw new Error('Account not found')
+  const now = new Date().toISOString()
+  db.prepare(
+    `UPDATE app_accounts SET
+      email_launches = ?,
+      email_presale = ?,
+      email_season = ?,
+      updated_at = ?
+     WHERE id = ?`,
+  ).run(
+    emailAlerts.launches ? 1 : 0,
+    emailAlerts.presale ? 1 : 0,
+    emailAlerts.season ? 1 : 0,
+    now,
+    account.id,
+  )
+  logAudit(
+    'account_prefs',
+    account.googleId ?? account.email,
+    null,
+    null,
+    JSON.stringify(emailAlerts),
+  )
+  return identity.googleId
+    ? getAppAccountByGoogleId(identity.googleId)
+    : getAppAccountByEmail(account.email)
+}
+
+export function getAppAccountProfile(identity) {
+  const account = identity.googleId
+    ? getAppAccountByGoogleId(identity.googleId)
+    : identity.email
+      ? getAppAccountByEmail(identity.email)
+      : identity.accountId
+        ? getAppAccountById(identity.accountId)
+        : null
+  if (!account) return null
+
+  let presaleContributions = 0
+  if (account.walletAddress) {
+    presaleContributions = db
+      .prepare(
+        `SELECT COUNT(*) as n FROM presale_purchases
+         WHERE LOWER(payer_address) = ? OR LOWER(receive_address) = ?`,
+      )
+      .get(account.walletAddress, account.walletAddress)?.n ?? 0
+  }
+
+  const teamPoolUser = account.discordId
+    ? Boolean(getUserByDiscord(account.discordId))
+    : false
+
+  return {
+    account,
+    links: {
+      walletLinked: Boolean(account.walletAddress),
+      discordLinked: Boolean(account.discordId),
+      presaleContributions,
+      teamPoolUser,
+      seasonPoints: null,
+    },
+  }
+}
+
+export function listAppAccountsForEmailDigest(type = 'launches') {
+  const col =
+    type === 'presale' ? 'email_presale' : type === 'season' ? 'email_season' : 'email_launches'
+  const rows = db.prepare(`SELECT * FROM app_accounts WHERE ${col} = 1`).all()
+  return rows.map(mapAppAccountRow)
+}
+
+function mapAppAccountAuthRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash ?? null,
+    walletAddress: row.wallet_address ?? null,
+    solanaAddress: row.solana_address ?? null,
+    walletEnc:
+      row.wallet_enc_salt && row.wallet_enc_iv && row.wallet_enc_ciphertext
+        ? {
+            v: row.wallet_enc_version ?? 1,
+            address: row.wallet_address,
+            saltB64: row.wallet_enc_salt,
+            ivB64: row.wallet_enc_iv,
+            ciphertextB64: row.wallet_enc_ciphertext,
+            createdAt: row.updated_at ?? row.created_at,
+          }
+        : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function getAppAccountById(id) {
+  return mapAppAccountRow(db.prepare('SELECT * FROM app_accounts WHERE id = ?').get(id))
+}
+
+export function getEyesAccountAuthByEmail(email) {
+  const row = db.prepare('SELECT * FROM app_accounts WHERE email = ?').get(email.toLowerCase())
+  return mapAppAccountAuthRow(row)
+}
+
+export function createEyesAccount({
+  email,
+  passwordHash,
+  walletAddress,
+  walletEncSalt,
+  walletEncIv,
+  walletEncCiphertext,
+  solanaAddress,
+}) {
+  const normalized = email.toLowerCase()
+  const existing = db.prepare('SELECT * FROM app_accounts WHERE email = ?').get(normalized)
+  if (existing?.password_hash) throw new Error('Email already registered')
+
+  const now = new Date().toISOString()
+  const walletNorm = walletAddress?.toLowerCase() ?? null
+  const solNorm = solanaAddress?.trim() || null
+
+  if (existing) {
+    db.prepare(
+      `UPDATE app_accounts SET
+        password_hash = ?,
+        wallet_address = ?,
+        solana_address = COALESCE(?, solana_address),
+        wallet_enc_salt = ?,
+        wallet_enc_iv = ?,
+        wallet_enc_ciphertext = ?,
+        wallet_enc_version = 1,
+        updated_at = ?
+       WHERE email = ?`,
+    ).run(
+      passwordHash,
+      walletNorm,
+      solNorm,
+      walletEncSalt,
+      walletEncIv,
+      walletEncCiphertext,
+      now,
+      normalized,
+    )
+    logAudit('eyes_account_create', normalized, walletNorm, null, 'upgrade_email_only')
+    exportSnapshot()
+    return getEyesAccountAuthByEmail(normalized)
+  }
+
+  const id = randomUUID()
+  db.prepare(
+    `INSERT INTO app_accounts (
+      id, email, password_hash, wallet_address, solana_address,
+      wallet_enc_salt, wallet_enc_iv, wallet_enc_ciphertext, wallet_enc_version,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+  ).run(
+    id,
+    normalized,
+    passwordHash,
+    walletNorm,
+    solNorm,
+    walletEncSalt,
+    walletEncIv,
+    walletEncCiphertext,
+    now,
+    now,
+  )
+  logAudit('eyes_account_create', normalized, walletNorm, null, 'new')
+  exportSnapshot()
+  return getEyesAccountAuthByEmail(normalized)
+}
+
+export function updateEyesAccountSolanaAddress(email, solanaAddress, { onlyIfMissing = true } = {}) {
+  const normalized = email.toLowerCase()
+  const solNorm = solanaAddress?.trim()
+  if (!solNorm) throw new Error('solanaAddress required')
+
+  const row = db.prepare('SELECT id, solana_address FROM app_accounts WHERE email = ?').get(normalized)
+  if (!row) throw new Error('Account not found')
+  if (onlyIfMissing && row.solana_address) return getEyesAccountAuthByEmail(normalized)
+
+  const now = new Date().toISOString()
+  db.prepare('UPDATE app_accounts SET solana_address = ?, updated_at = ? WHERE email = ?').run(
+    solNorm,
+    now,
+    normalized,
+  )
+  logAudit('eyes_account_solana', normalized, null, null, onlyIfMissing ? 'backfill' : 'verify')
+  exportSnapshot()
+  return getEyesAccountAuthByEmail(normalized)
+}
+
+function mapLaunchMetadataRow(row) {
+  if (!row) return null
+  return {
+    launchId: row.launch_id,
+    chainKey: row.chain_key ?? 'base',
+    tokenAddress: row.token_address,
+    pairAddress: row.pair_address ?? null,
+    name: row.name,
+    symbol: row.symbol,
+    description: row.description ?? undefined,
+    website: row.website ?? undefined,
+    twitter: row.twitter ?? undefined,
+    telegram: row.telegram ?? undefined,
+    creator: row.creator,
+    deployTxHash: row.deploy_tx_hash ?? undefined,
+    seedTxHash: row.seed_tx_hash ?? undefined,
+    fomoUrl: row.fomo_url,
+    registeredAt: row.registered_at,
+  }
+}
+
+export function registerLaunchMetadata(input) {
+  const now = new Date().toISOString()
+  const chainKey = input.chainKey ?? 'base'
+  const token =
+    chainKey === 'solana'
+      ? String(input.tokenAddress ?? '').trim()
+      : String(input.tokenAddress ?? '').toLowerCase()
+  const creator =
+    chainKey === 'solana'
+      ? String(input.creator ?? '').trim()
+      : String(input.creator ?? '').toLowerCase()
+  if (!token || !creator || !input.name || !input.symbol || !input.fomoUrl) {
+    throw new Error('launch metadata fields incomplete')
+  }
+
+  db.prepare(
+    `INSERT INTO launch_metadata (
+      launch_id, chain_key, token_address, pair_address, name, symbol, description,
+      website, twitter, telegram, creator, deploy_tx_hash, seed_tx_hash,
+      fomo_url, registered_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(token_address) DO UPDATE SET
+      launch_id = excluded.launch_id,
+      chain_key = excluded.chain_key,
+      token_address = excluded.token_address,
+      pair_address = excluded.pair_address,
+      name = excluded.name,
+      symbol = excluded.symbol,
+      description = excluded.description,
+      website = excluded.website,
+      twitter = excluded.twitter,
+      telegram = excluded.telegram,
+      creator = excluded.creator,
+      deploy_tx_hash = excluded.deploy_tx_hash,
+      seed_tx_hash = excluded.seed_tx_hash,
+      fomo_url = excluded.fomo_url,
+      registered_at = excluded.registered_at`,
+  ).run(
+    input.launchId,
+    chainKey,
+    token,
+    chainKey === 'solana'
+      ? input.pairAddress?.trim() ?? null
+      : input.pairAddress?.toLowerCase() ?? null,
+    input.name,
+    input.symbol,
+    input.description ?? null,
+    input.website ?? null,
+    input.twitter ?? null,
+    input.telegram ?? null,
+    creator,
+    input.deployTxHash ?? null,
+    input.seedTxHash ?? null,
+    input.fomoUrl,
+    now,
+  )
+
+  logAudit('launch_register', String(input.launchId), token, null, `${chainKey}:${input.symbol}`)
+  exportSnapshot()
+  const tokenLookup =
+    chainKey === 'solana'
+      ? String(input.tokenAddress ?? '').trim()
+      : String(input.tokenAddress ?? '').toLowerCase()
+  return mapLaunchMetadataRow(
+    db.prepare('SELECT * FROM launch_metadata WHERE token_address = ?').get(tokenLookup),
+  )
+}
+
+export function listLaunchMetadata() {
+  const rows = db.prepare('SELECT * FROM launch_metadata ORDER BY launch_id DESC').all()
+  return rows.map(mapLaunchMetadataRow).filter(Boolean)
+}
+
+export function hasBoostNotification(txHash) {
+  if (!txHash) return false
+  const row = db
+    .prepare('SELECT tx_hash FROM boost_notifications WHERE tx_hash = ?')
+    .get(String(txHash).toLowerCase())
+  return Boolean(row)
+}
+
+export function recordBoostNotification({ txHash, packageId, launchId }) {
+  const hash = String(txHash).toLowerCase()
+  db.prepare(
+    'INSERT OR IGNORE INTO boost_notifications (tx_hash, package_id, launch_id, created_at) VALUES (?, ?, ?, ?)',
+  ).run(hash, packageId, launchId, new Date().toISOString())
+  logAudit('boost_notify', launchId, hash, null, packageId)
+}
+
+function mapAccountSettingsRow(row) {
+  if (!row) return null
+  const chains = (row.webhook_filter_chains ?? '')
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean)
+  const events = (row.webhook_events ?? 'launch.created,launch.discovery_registered')
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean)
+  return {
+    defaultLaunchChain: row.default_launch_chain ?? 'base',
+    launchWebhookUrl: row.launch_webhook_url ?? null,
+    launchWebhookSecret: row.launch_webhook_secret ?? null,
+    publicCreatorProfile: row.public_creator_profile !== 0,
+    webhookFilterChains: chains,
+    webhookOnlyMine: row.webhook_only_mine === 1,
+    webhookEvents: events.length ? events : ['launch.created', 'launch.discovery_registered'],
+    walletAutoLockMinutes: row.wallet_auto_lock_minutes ?? 15,
+    discordDmLaunches: row.discord_dm_launches === 1,
+    discordDmPresale: row.discord_dm_presale === 1,
+    discordDmSeason: row.discord_dm_season === 1,
+  }
+}
+
+function mapApiKeyRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    email: row.email,
+    name: row.name,
+    keyPrefix: row.key_prefix,
+    scopes: row.scopes.split(',').filter(Boolean),
+    tier: row.tier ?? 'free',
+    kind: row.kind ?? 'personal',
+    teamId: row.team_id ?? null,
+    createdAt: row.created_at,
+    lastUsedAt: row.last_used_at ?? null,
+    revokedAt: row.revoked_at ?? null,
+  }
+}
+
+const TIER_DAILY_LIMITS = { free: 2000, pro: 50000, team: 10000 }
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function incrementApiKeyUsage(keyId) {
+  const day = todayKey()
+  db.prepare(
+    `INSERT INTO api_usage_daily (key_id, day, count) VALUES (?, ?, 1)
+     ON CONFLICT(key_id, day) DO UPDATE SET count = count + 1`,
+  ).run(keyId, day)
+  const row = db.prepare('SELECT * FROM api_keys WHERE id = ?').get(keyId)
+  if (!row) return
+  const dayKey = row.requests_day_key
+  if (dayKey === day) {
+    db.prepare('UPDATE api_keys SET requests_today = requests_today + 1, last_used_at = ? WHERE id = ?').run(
+      new Date().toISOString(),
+      keyId,
+    )
+  } else {
+    db.prepare(
+      'UPDATE api_keys SET requests_today = 1, requests_day_key = ?, last_used_at = ? WHERE id = ?',
+    ).run(day, new Date().toISOString(), keyId)
+  }
+}
+
+export function changeEyesAccountPassword({
+  email,
+  passwordHash,
+  walletEncSalt,
+  walletEncIv,
+  walletEncCiphertext,
+}) {
+  const normalized = email.toLowerCase()
+  const row = db.prepare('SELECT id FROM app_accounts WHERE email = ?').get(normalized)
+  if (!row?.id) throw new Error('Account not found')
+  const now = new Date().toISOString()
+  db.prepare(
+    `UPDATE app_accounts SET
+      password_hash = ?,
+      wallet_enc_salt = ?,
+      wallet_enc_iv = ?,
+      wallet_enc_ciphertext = ?,
+      wallet_enc_version = 1,
+      updated_at = ?
+     WHERE email = ?`,
+  ).run(passwordHash, walletEncSalt, walletEncIv, walletEncCiphertext, now, normalized)
+  logAudit('eyes_account_password', normalized, null, null, 'changed')
+  exportSnapshot()
+  return getEyesAccountAuthByEmail(normalized)
+}
+
+export function getAccountSettings(email) {
+  const row = db.prepare('SELECT * FROM app_accounts WHERE email = ?').get(email.toLowerCase())
+  if (!row) throw new Error('Account not found')
+  return mapAccountSettingsRow(row)
+}
+
+export function updateAccountSettings(email, input) {
+  const normalized = email.toLowerCase()
+  const row = db.prepare('SELECT id FROM app_accounts WHERE email = ?').get(normalized)
+  if (!row?.id) throw new Error('Account not found')
+  const now = new Date().toISOString()
+  const chains = Array.isArray(input.webhookFilterChains)
+    ? input.webhookFilterChains.join(',')
+    : null
+  const events = Array.isArray(input.webhookEvents) ? input.webhookEvents.join(',') : null
+  db.prepare(
+    `UPDATE app_accounts SET
+      default_launch_chain = COALESCE(?, default_launch_chain),
+      launch_webhook_url = ?,
+      launch_webhook_secret = ?,
+      public_creator_profile = COALESCE(?, public_creator_profile),
+      webhook_filter_chains = COALESCE(?, webhook_filter_chains),
+      webhook_only_mine = COALESCE(?, webhook_only_mine),
+      webhook_events = COALESCE(?, webhook_events),
+      wallet_auto_lock_minutes = COALESCE(?, wallet_auto_lock_minutes),
+      discord_dm_launches = COALESCE(?, discord_dm_launches),
+      discord_dm_presale = COALESCE(?, discord_dm_presale),
+      discord_dm_season = COALESCE(?, discord_dm_season),
+      updated_at = ?
+     WHERE email = ?`,
+  ).run(
+    input.defaultLaunchChain ?? null,
+    input.launchWebhookUrl ?? null,
+    input.launchWebhookSecret ?? null,
+    input.publicCreatorProfile === undefined ? null : input.publicCreatorProfile ? 1 : 0,
+    chains,
+    input.webhookOnlyMine === undefined ? null : input.webhookOnlyMine ? 1 : 0,
+    events,
+    input.walletAutoLockMinutes ?? null,
+    input.discordDmLaunches === undefined ? null : input.discordDmLaunches ? 1 : 0,
+    input.discordDmPresale === undefined ? null : input.discordDmPresale ? 1 : 0,
+    input.discordDmSeason === undefined ? null : input.discordDmSeason ? 1 : 0,
+    now,
+    normalized,
+  )
+  logAudit('account_settings', normalized, null, null, 'update')
+  exportSnapshot()
+  return getAccountSettings(normalized)
+}
+
+export function createApiKey({
+  accountId,
+  email,
+  name,
+  keyHash,
+  keyPrefix,
+  scopes,
+  tier,
+  kind,
+  teamId,
+}) {
+  const id = randomUUID()
+  const now = new Date().toISOString()
+  const scopeStr = Array.isArray(scopes) ? scopes.join(',') : String(scopes ?? 'launches:read')
+  const keyTier = tier ?? (kind === 'team' ? 'team' : 'free')
+  const keyKind = kind ?? 'personal'
+  db.prepare(
+    `INSERT INTO api_keys (id, account_id, email, name, key_prefix, key_hash, scopes, tier, kind, team_id, created_at, requests_today, requests_day_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+  ).run(
+    id,
+    accountId,
+    email.toLowerCase(),
+    name,
+    keyPrefix,
+    keyHash,
+    scopeStr,
+    keyTier,
+    keyKind,
+    teamId ?? null,
+    now,
+    todayKey(),
+  )
+  logAudit('api_key_create', email.toLowerCase(), keyPrefix, null, name)
+  exportSnapshot()
+  return mapApiKeyRow(db.prepare('SELECT * FROM api_keys WHERE id = ?').get(id))
+}
+
+export function listApiKeys(accountId) {
+  const rows = db
+    .prepare(
+      `SELECT * FROM api_keys WHERE account_id = ? AND revoked_at IS NULL ORDER BY created_at DESC`,
+    )
+    .all(accountId)
+  return rows.map(mapApiKeyRow).filter(Boolean)
+}
+
+export function revokeApiKey({ accountId, keyId }) {
+  const row = db.prepare('SELECT * FROM api_keys WHERE id = ? AND account_id = ?').get(keyId, accountId)
+  if (!row) throw new Error('API key not found')
+  const now = new Date().toISOString()
+  db.prepare('UPDATE api_keys SET revoked_at = ? WHERE id = ?').run(now, keyId)
+  logAudit('api_key_revoke', row.email, row.key_prefix, null, keyId)
+  exportSnapshot()
+  return mapApiKeyRow({ ...row, revoked_at: now })
+}
+
+export function getApiKeyAuth(keyHash) {
+  const row = db
+    .prepare(`SELECT * FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL`)
+    .get(keyHash)
+  if (!row) return null
+  incrementApiKeyUsage(row.id)
+  return mapApiKeyRow(db.prepare('SELECT * FROM api_keys WHERE id = ?').get(row.id))
+}
+
+export function getApiKeyUsage(accountId, keyId) {
+  const row = db.prepare('SELECT * FROM api_keys WHERE id = ? AND account_id = ?').get(keyId, accountId)
+  if (!row) throw new Error('API key not found')
+  const tier = row.tier ?? 'free'
+  const dailyLimit = TIER_DAILY_LIMITS[tier] ?? TIER_DAILY_LIMITS.free
+  const day = todayKey()
+  const requestsToday =
+    row.requests_day_key === day ? row.requests_today ?? 0 : 0
+  const history = db
+    .prepare(
+      `SELECT day, count FROM api_usage_daily WHERE key_id = ? ORDER BY day DESC LIMIT 14`,
+    )
+    .all(keyId)
+    .map((r) => ({ day: r.day, count: r.count }))
+  return {
+    keyId,
+    tier,
+    dailyLimit,
+    requestsToday,
+    overageTokensBurned: row.overage_tokens_burned ?? 0,
+    history,
+  }
+}
+
+export function listApiKeyUsage(accountId) {
+  const keys = listApiKeys(accountId)
+  return keys.map((k) => getApiKeyUsage(accountId, k.id))
+}
+
+export function createPasswordResetToken(email) {
+  const normalized = email.toLowerCase()
+  const row = db.prepare('SELECT id FROM app_accounts WHERE email = ?').get(normalized)
+  if (!row?.id) throw new Error('Account not found')
+  const raw = randomUUID() + randomUUID()
+  const tokenHash = createHash('sha256').update(raw).digest('hex')
+  const now = new Date().toISOString()
+  const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  db.prepare(
+    'INSERT INTO password_reset_tokens (token_hash, email, expires_at, created_at) VALUES (?, ?, ?, ?)',
+  ).run(tokenHash, normalized, expires, now)
+  exportSnapshot()
+  return { token: raw, expiresAt: expires }
+}
+
+export function consumePasswordResetToken(rawToken, passwordHash) {
+  const tokenHash = createHash('sha256').update(rawToken).digest('hex')
+  const row = db.prepare('SELECT * FROM password_reset_tokens WHERE token_hash = ?').get(tokenHash)
+  if (!row || row.used_at) throw new Error('Invalid or expired reset link')
+  if (row.expires_at < new Date().toISOString()) throw new Error('Reset link expired')
+  const now = new Date().toISOString()
+  db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ?').run(now, tokenHash)
+  db.prepare(
+    `UPDATE app_accounts SET password_hash = ?, wallet_enc_salt = NULL, wallet_enc_iv = NULL,
+     wallet_enc_ciphertext = NULL, updated_at = ? WHERE email = ?`,
+  ).run(passwordHash, now, row.email)
+  logAudit('eyes_account_password', row.email, null, null, 'reset')
+  exportSnapshot()
+  return row.email
+}
+
+export function exportAccountData(email) {
+  const normalized = email.toLowerCase()
+  const account = mapAppAccountRow(db.prepare('SELECT * FROM app_accounts WHERE email = ?').get(normalized))
+  if (!account) throw new Error('Account not found')
+  const settings = getAccountSettings(normalized)
+  const keys = listApiKeys(account.id).map(({ keyPrefix, name, scopes, tier, kind, createdAt, lastUsedAt }) => ({
+    keyPrefix,
+    name,
+    scopes,
+    tier,
+    kind,
+    createdAt,
+    lastUsedAt,
+  }))
+  return {
+    exportedAt: new Date().toISOString(),
+    account: {
+      id: account.id,
+      email: account.email,
+      walletAddress: account.walletAddress,
+      solanaAddress: account.solanaAddress,
+      createdAt: account.createdAt,
+    },
+    settings,
+    apiKeys: keys,
+  }
+}
+
+export function deleteAccount(email) {
+  const normalized = email.toLowerCase()
+  const row = db.prepare('SELECT id FROM app_accounts WHERE email = ?').get(normalized)
+  if (!row?.id) throw new Error('Account not found')
+  db.prepare('UPDATE api_keys SET revoked_at = ? WHERE account_id = ?').run(
+    new Date().toISOString(),
+    row.id,
+  )
+  db.prepare(
+    `UPDATE app_accounts SET
+      password_hash = NULL,
+      wallet_address = NULL,
+      solana_address = NULL,
+      wallet_enc_salt = NULL,
+      wallet_enc_iv = NULL,
+      wallet_enc_ciphertext = NULL,
+      email = ?,
+      updated_at = ?
+     WHERE id = ?`,
+  ).run(`deleted+${row.id}@eyesopen.invalid`, new Date().toISOString(), row.id)
+  logAudit('account_delete', normalized, row.id, null, 'scrubbed')
+  exportSnapshot()
+  return { ok: true }
+}
+
+export function createOAuthApp({ accountId, name, clientId, clientSecretHash, clientPrefix, redirectUris, scopes }) {
+  const id = randomUUID()
+  const now = new Date().toISOString()
+  db.prepare(
+    `INSERT INTO oauth_apps (id, account_id, name, client_id, client_secret_hash, client_prefix, redirect_uris, scopes, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    accountId,
+    name,
+    clientId,
+    clientSecretHash,
+    clientPrefix,
+    JSON.stringify(redirectUris),
+    scopes.join(','),
+    now,
+  )
+  exportSnapshot()
+  return mapOAuthAppRow(db.prepare('SELECT * FROM oauth_apps WHERE id = ?').get(id))
+}
+
+function mapOAuthAppRow(row) {
+  if (!row) return null
+  let redirectUris = []
+  try {
+    redirectUris = JSON.parse(row.redirect_uris)
+  } catch {
+    redirectUris = []
+  }
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    name: row.name,
+    clientId: row.client_id,
+    clientPrefix: row.client_prefix,
+    redirectUris,
+    scopes: row.scopes.split(',').filter(Boolean),
+    createdAt: row.created_at,
+    revokedAt: row.revoked_at ?? null,
+  }
+}
+
+export function listOAuthApps(accountId) {
+  return db
+    .prepare('SELECT * FROM oauth_apps WHERE account_id = ? AND revoked_at IS NULL ORDER BY created_at DESC')
+    .all(accountId)
+    .map(mapOAuthAppRow)
+    .filter(Boolean)
+}
+
+export function getOAuthAppByClientId(clientId) {
+  return mapOAuthAppRow(
+    db.prepare('SELECT * FROM oauth_apps WHERE client_id = ? AND revoked_at IS NULL').get(clientId),
+  )
+}
+
+export function createOAuthCode({ appId, accountId, redirectUri, scopes }) {
+  const raw = randomUUID()
+  const codeHash = createHash('sha256').update(raw).digest('hex')
+  const now = new Date().toISOString()
+  const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  db.prepare(
+    `INSERT INTO oauth_codes (code_hash, app_id, account_id, redirect_uri, scopes, expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(codeHash, appId, accountId, redirectUri, scopes.join(','), expires, now)
+  return raw
+}
+
+export function exchangeOAuthCode({ rawCode, clientId, clientSecretHash, redirectUri }) {
+  const app = getOAuthAppByClientId(clientId)
+  if (!app || app.clientPrefix !== clientId.slice(0, 12)) {
+    throw new Error('Invalid client')
+  }
+  const appRow = db.prepare('SELECT client_secret_hash FROM oauth_apps WHERE client_id = ?').get(clientId)
+  if (!appRow || appRow.client_secret_hash !== clientSecretHash) throw new Error('Invalid client secret')
+  const codeHash = createHash('sha256').update(rawCode).digest('hex')
+  const row = db.prepare('SELECT * FROM oauth_codes WHERE code_hash = ?').get(codeHash)
+  if (!row || row.used_at || row.expires_at < new Date().toISOString()) {
+    throw new Error('Invalid or expired code')
+  }
+  if (row.redirect_uri !== redirectUri) throw new Error('Redirect URI mismatch')
+  db.prepare('UPDATE oauth_codes SET used_at = ? WHERE code_hash = ?').run(new Date().toISOString(), codeHash)
+  const account = getAppAccountById(row.account_id)
+  if (!account?.email) throw new Error('Account not found')
+  const rawKey = `eok_oauth_${randomBytes(32).toString('base64url')}`
+  const keyHash = createHash('sha256').update(rawKey).digest('hex')
+  const keyPrefix = rawKey.slice(0, 20)
+  const record = createApiKey({
+    accountId: row.account_id,
+    email: account.email,
+    name: `OAuth · ${app.name}`,
+    keyHash,
+    keyPrefix,
+    scopes: row.scopes.split(',').filter(Boolean),
+    tier: 'free',
+    kind: 'personal',
+  })
+  return { accessToken: rawKey, tokenType: 'Bearer', scopes: row.scopes.split(','), key: record }
 }

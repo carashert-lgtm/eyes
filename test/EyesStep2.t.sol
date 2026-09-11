@@ -19,6 +19,8 @@ import {MockUniswapV2Factory} from "./mocks/MockUniswapV2.sol";
 import {MockUniswapV2Router} from "./mocks/MockUniswapV2Router.sol";
 
 contract EyesStep2Test is Test {
+    address internal constant DEAD = 0x000000000000000000000000000000000000dEaD;
+
     EyesToken internal eyes;
     EyesFeeCollector internal collector;
     EyesLaunchFactory internal factory;
@@ -90,7 +92,8 @@ contract EyesStep2Test is Test {
 
         assertTrue(pair != address(0));
         assertEq(lpAmount, tokenAmount + ethAmount);
-        assertEq(IERC20(pair).balanceOf(address(locker)), lpAmount);
+        assertEq(IERC20(pair).balanceOf(DEAD), lpAmount);
+        assertEq(IERC20(pair).balanceOf(address(locker)), 0);
         assertEq(locker.lockedBalance(launchId), lpAmount);
 
         EyesTypes.LaunchInfo memory info = factory.getLaunch(launchId);
@@ -103,6 +106,19 @@ contract EyesStep2Test is Test {
         vm.prank(pair);
         EyesLaunchToken(token).transfer(buyer, 100 ether);
         assertEq(EyesLaunchToken(token).balanceOf(buyer), 100 ether);
+
+        // DEX sells to pair must succeed during Eyes Window (FOMO honeypot simulation).
+        vm.prank(buyer);
+        EyesLaunchToken(token).transfer(pair, 50 ether);
+        assertEq(EyesLaunchToken(token).balanceOf(buyer), 50 ether);
+
+        // Unsold factory inventory is burned to dead after seeding.
+        assertEq(EyesLaunchToken(token).balanceOf(address(factory)), 0);
+        assertEq(
+            EyesLaunchToken(token).balanceOf(DEAD),
+            EyesTypes.DEFAULT_LAUNCH_SUPPLY - tokenAmount
+        );
+        assertEq(EyesLaunchToken(token).uniswapPair(), pair);
     }
 
     function test_FeeRouter_SendsFeesToCollectorOnBuy() public {

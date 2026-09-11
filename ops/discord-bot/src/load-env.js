@@ -8,6 +8,7 @@ import dotenv from 'dotenv'
 import { existsSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { lpcConfigured } from './lpc.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const botDir = path.join(__dirname, '..')
@@ -45,6 +46,7 @@ export function logEnvHealth() {
     ['DISCORD_OWNER_IDS', Boolean(process.env.DISCORD_OWNER_IDS?.trim())],
     ['DISCORD_GUILD_ID', Boolean(process.env.DISCORD_GUILD_ID?.trim())],
     ['PLATFORM_API_SECRET', Boolean(process.env.PLATFORM_API_SECRET?.trim())],
+    ['LPC_BOT_KEY or warden.key', lpcConfigured()],
   ]
   for (const [key, ok] of checks) {
     console.log(`  ${ok ? '✓' : '✗'} ${key}`)

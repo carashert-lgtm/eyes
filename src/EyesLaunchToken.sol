@@ -13,8 +13,8 @@ import {IEyesLaunchToken} from "./interfaces/IEyesLaunchpad.sol";
 /// Core rules (per launch token):
 /// - Supply minted once to the factory (later routed to LP + Eyes Window inventory).
 /// - Eyes Window: timed gated buy period before open trading.
-///   During the window, only buys from approved addresses (router/pair) are allowed.
-///   User-to-user transfers and sells are blocked.
+///   During the window, only buys from approved addresses (router/pair) and DEX sells to the pair are allowed.
+///   Wallet-to-wallet transfers are blocked.
 /// - After the window, token enters Trading phase (normal transfers).
 /// - 100% liquidity lock is committed at the factory level (pair lock contract = future step).
 contract EyesLaunchToken is ERC20, Ownable, IEyesLaunchToken {
@@ -25,6 +25,7 @@ contract EyesLaunchToken is ERC20, Ownable, IEyesLaunchToken {
     uint64 public eyesWindowStart;
     uint64 public eyesWindowEnd;
     bool public liquidityLocked;
+    address public uniswapPair;
 
     /// @dev Addresses allowed to send tokens during Eyes Window (e.g. LP pair, launch vault).
     mapping(address => bool) public approvedBuySources;
@@ -66,6 +67,11 @@ contract EyesLaunchToken is ERC20, Ownable, IEyesLaunchToken {
         phase = EyesTypes.LaunchPhase.Trading;
     }
 
+    /// @notice Register the Uniswap pair so DEX sells are allowed during the Eyes Window.
+    function setUniswapPair(address pair) external onlyFactory {
+        uniswapPair = pair;
+    }
+
     /// @inheritdoc IEyesLaunchToken
     function markLiquidityLocked() external onlyFactory {
         liquidityLocked = true;
@@ -83,8 +89,11 @@ contract EyesLaunchToken is ERC20, Ownable, IEyesLaunchToken {
         eyesWindowEnd = end;
     }
 
-    /// @dev Enforces gated buy period. Sells and wallet-to-wallet transfers are blocked.
+    /// @dev Enforces gated buy period. Wallet-to-wallet transfers are blocked; DEX buys/sells are allowed.
     function _update(address from, address to, uint256 value) internal override {
+        if (phase == EyesTypes.LaunchPhase.EyesWindow && block.timestamp > eyesWindowEnd) {
+            phase = EyesTypes.LaunchPhase.Trading;
+        }
         if (phase == EyesTypes.LaunchPhase.EyesWindow) {
             _enforceEyesWindowTransfer(from, to);
         }
@@ -92,20 +101,23 @@ contract EyesLaunchToken is ERC20, Ownable, IEyesLaunchToken {
     }
 
     function _enforceEyesWindowTransfer(address from, address to) internal view {
-        if (block.timestamp < eyesWindowStart || block.timestamp > eyesWindowEnd) {
+        if (block.timestamp < eyesWindowStart) {
             revert EyesWindowClosed();
         }
 
         // Mint / burn paths are always allowed.
         if (from == address(0) || to == address(0)) return;
 
-        // Factory inventory moves (LP seeding, router float, operational setup).
+        // Factory inventory moves (LP seeding, operational setup).
         if (from == owner()) return;
 
-        // Buys during the Eyes Window: approved pair/router/vault -> any buyer wallet.
+        // Buys during the Eyes Window: approved pair/router/vault -> buyer wallet.
         if (approvedBuySources[from]) return;
 
-        // Block sells (wallet -> pair) and wallet-to-wallet transfers.
+        // DEX sells during the Eyes Window: wallet -> Uniswap pair.
+        if (uniswapPair != address(0) && to == uniswapPair) return;
+
+        // Block wallet-to-wallet and other off-pad transfers.
         revert TransferBlockedDuringWindow();
     }
 }

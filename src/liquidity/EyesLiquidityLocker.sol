@@ -6,14 +6,17 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @title EyesLiquidityLocker
-/// @notice Permanently custody Uniswap V2 LP tokens for Eyes Open fair launches.
+/// @notice Permanently burns Uniswap V2 LP tokens for Eyes Open fair launches.
 ///
 /// ## Permanent lock guarantee
-/// - LP tokens are transferred into this contract and **never released**.
+/// - LP tokens are sent to the dead address and **never released**.
 /// - There is intentionally **no** `withdraw`, `unlock`, or `transferOut` function.
-/// - Liquidity remains on the DEX pair; only the LP receipt tokens are locked here forever.
+/// - Liquidity remains on the DEX pair; LP receipt tokens are burned for scanner recognition.
 contract EyesLiquidityLocker is ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    /// @dev Standard burn address recognized by DEX scanners (DexScreener, FOMO, etc.).
+    address internal constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
     struct LockRecord {
         uint256 launchId;
@@ -71,7 +74,7 @@ contract EyesLiquidityLocker is ReentrancyGuard {
         if (lpAmount == 0) revert ZeroAmount();
         if (locks[launchId].lpAmount != 0) revert AlreadyLocked();
 
-        IERC20(pair).safeTransferFrom(msg.sender, address(this), lpAmount);
+        IERC20(pair).safeTransferFrom(msg.sender, DEAD, lpAmount);
 
         locks[launchId] = LockRecord({
             launchId: launchId,
@@ -86,10 +89,8 @@ contract EyesLiquidityLocker is ReentrancyGuard {
         emit LiquidityPermanentlyLocked(launchId, launchToken, pair, creator, lpAmount);
     }
 
-    /// @notice Returns the permanently locked LP balance held for a launch.
+    /// @notice Returns the permanently locked LP amount recorded for a launch.
     function lockedBalance(uint256 launchId) external view returns (uint256) {
-        LockRecord memory record = locks[launchId];
-        if (record.pair == address(0)) return 0;
-        return IERC20(record.pair).balanceOf(address(this));
+        return locks[launchId].lpAmount;
     }
 }

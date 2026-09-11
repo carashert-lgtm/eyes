@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { ConditionalSocialDock } from '@/components/layout/ConditionalSocialDock'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -13,8 +14,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light',
-  themeColor: '#faf7f0',
+  colorScheme: 'dark',
+  themeColor: '#0a0908',
 }
 
 export default function RootLayout({
@@ -36,7 +37,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        <ConditionalSocialDock />
+      </body>
     </html>
   )
 }

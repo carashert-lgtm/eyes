@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { CtaButton } from '@/components/ui/CtaButton'
+import { getLaunchChain } from '@/lib/launch-chains/registry'
 import { ROUTES } from '@/lib/site-config'
 import { phaseLabel, type RankedLaunch } from '@/lib/launch-types'
 
@@ -67,8 +68,8 @@ export function RecentLaunchesFeed() {
               </span>
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {phaseLabel(launch.phase)} · {formatUsd(launch.volumeUsd24h)} vol · rank{' '}
-              {launch.rankScore.toFixed(2)}
+              {getLaunchChain(launch.chainKey).label} · {phaseLabel(launch.phase)} ·{' '}
+              {formatUsd(launch.volumeUsd24h)} vol · rank {launch.rankScore.toFixed(2)}
             </p>
           </div>
           {launch.isBoosted ? (

@@ -37,9 +37,7 @@ contract DeployEyes is EyesScriptBase {
     }
 
     function run() external returns (Deployment memory d) {
-        if (block.chainid == BaseSepoliaConfig.CHAIN_ID) {
-            _requireChain(BaseSepoliaConfig.CHAIN_ID);
-        }
+        _enforceSupportedChain();
 
         _preflightBroadcast("deploy", 0.005 ether);
 
@@ -69,6 +67,8 @@ contract DeployEyes is EyesScriptBase {
             new EyesBuyBurnExecutor(address(d.feeCollector), address(d.eyes), d.dexRouter);
         d.feeCollector.setBuyBurnExecutor(address(d.buyBurnExecutor));
 
+        _prepareAnvilBuyBurn(address(d.buyBurnExecutor));
+
         vm.stopBroadcast();
 
         _writeDeploymentJson(
@@ -93,8 +93,8 @@ contract DeployEyes is EyesScriptBase {
         console2.log("dexRouter", d.dexRouter);
         console2.log("weth", d.weth);
         console2.log("treasury", treasury);
-        console2.log("Saved", DEPLOYMENT_PATH);
-        console2.log("Env snippet", ENV_SNIPPET_PATH);
-        console2.log("Merge deployments/base-sepolia.env into your .env");
+        console2.log("Saved", _deploymentPath());
+        console2.log("Env snippet", _envSnippetPath());
+        console2.log("Merge deployment env into your .env (or use deploy-anvil.ps1)");
     }
 }

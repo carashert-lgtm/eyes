@@ -19,6 +19,8 @@ interface IEyesLaunchToken {
     function openEyesWindow() external;
     function endEyesWindow() external;
     function markLiquidityLocked() external;
+    function setUniswapPair(address pair) external;
+    function uniswapPair() external view returns (address);
 }
 
 interface IEyesLaunchFactory {

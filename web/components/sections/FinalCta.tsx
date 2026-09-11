@@ -1,6 +1,6 @@
 import { Section, Eyebrow } from '@/components/ui/Section'
 import { CtaButton } from '@/components/ui/CtaButton'
-import { ROUTES } from '@/lib/site-config'
+import { ROUTES, STATUS } from '@/lib/site-config'
 
 export function FinalCta() {
   return (
@@ -25,7 +25,8 @@ export function FinalCta() {
           </h2>
           <p className="mt-5 text-base leading-relaxed text-muted-foreground sm:text-lg">
             Stop competing with bots for block zero. Deploy on Eyes Open, lock
-            liquidity forever, and let every trade strengthen $EYES.
+            liquidity forever, and route trading fees through the $EYES buy-and-burn
+            flywheel.
           </p>
 
           <div className="mt-9 flex flex-wrap justify-center gap-3">
@@ -36,7 +37,7 @@ export function FinalCta() {
           </div>
 
           <p className="mt-8 font-mono-label text-[0.62rem] text-muted-foreground">
-            Testnet live · Mainnet after audit
+            {STATUS.networkDetail}
           </p>
         </div>
       </div>

@@ -9,10 +9,10 @@ const valueDrivers = [
     metric: '↑ Launches',
   },
   {
-    title: 'Every trade creates buy pressure',
+    title: 'Fees queue buy-and-burn',
     description:
-      'Half of every fee is earmarked to purchase $EYES on the open market before burning — real demand, not synthetic staking rewards.',
-    metric: '↑ Buy pressure',
+      'Half of every fee is earmarked to purchase $EYES on the open market before burning — a protocol mechanic, not a price promise.',
+    metric: 'Fee routing',
   },
   {
     title: 'Burns reduce supply',
@@ -21,9 +21,9 @@ const valueDrivers = [
     metric: '↓ Supply',
   },
   {
-    title: 'Platform growth feeds the token',
+    title: 'Platform activity feeds the flywheel',
     description:
-      'More launches, more swaps, more fees — the flywheel compounds. $EYES is the settlement layer for the entire pad.',
+      'More launches and swaps route more fees through the burn queue. $EYES is the settlement layer for the pad — mechanics, not investment hype.',
     metric: '⟁ Flywheel',
   },
 ]
@@ -33,9 +33,9 @@ export function ValueSection() {
     <section className="border-t border-border py-24 lg:py-32">
       <Container>
         <SectionHeading
-          eyebrow="Value capture"
-          title="Why $EYES has value."
-          description="Not because of a meme. Because every launch on the platform generates economic activity that routes back to the token."
+          eyebrow="Protocol mechanics"
+          title="How the flywheel works."
+          description="Not because of a meme. Because every launch on the platform generates on-chain fee activity that routes through the documented buy-and-burn model."
           align="center"
           className="mx-auto"
         />

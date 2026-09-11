@@ -126,7 +126,7 @@ Crypto launches aren’t broken because people trade — they’re broken becaus
 
 **Fee flywheel** — swaps routed through **EyesFeeRouter** pay **1%**. **50%** goes to the launch creator in ETH. **50%** queues **buy & burn $EYES** on-market.
 
-**$EYES** is fixed at **1B supply**, minted once, with **no team allocation** in the official model. Platform growth reduces supply through transparent burns — not hype.
+**$EYES** is fixed at **1B supply**, minted once, with a **10% disclosed owner allocation**. Platform growth reduces circulating supply through transparent burns — not hype.
 
 Eyes Open. No Snipers. No Games.
 
@@ -173,7 +173,7 @@ We built enforceable rules:
 → 1% trading fee on every launch swap
 → 50% to creator · 50% buy & burn $EYES
 
-Fixed 1B $EYES supply. No team allocation in the official model.
+Fixed 1B $EYES supply. **10% owner allocation** disclosed.
 
 Read the mechanics (don’t ape blind):
 🏠 [landing page]
@@ -276,7 +276,7 @@ $EYES tokenomics in one line:
 1% launch trading fees → 50% creator / 50% buy & burn $EYES.
 
 No hidden protocol skim in the public model.
-1B fixed supply. No team allocation (official model).
+1B fixed supply. **10% owner allocation**.
 
 Full breakdown: [tokenomics link]
 ```
@@ -337,7 +337,7 @@ LP tokens go to `EyesLiquidityLocker` — **no withdraw function**. Verify the L
 **50%** to the launch creator in ETH, instantly. **50%** to the buy-and-burn queue — swapped into $EYES and burned by the keeper executor. Official model is **50/50**. See [`TOKENOMICS.md`](TOKENOMICS.md).
 
 ### “Is there a team allocation / insider bag?”
-**Not in the official model.** $EYES is **1B fixed supply**, minted once at deploy. If that ever changes, it must be announced on-chain and updated in public docs first.
+**Yes — 10% owner allocation, disclosed in docs and tokenomics.** Single owner recipient. Vesting/unlocks via Team Space — not a secret wallet. Presale and LP use separate buckets. See [`TOKENOMICS.md`](TOKENOMICS.md).
 
 ### “Does every launch token get burned?”
 **No.** Launch tokens are not burned by default. The burn mechanic targets **$EYES** — linking every launch’s volume to platform-token deflation.

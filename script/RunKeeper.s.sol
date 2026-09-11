@@ -14,9 +14,7 @@ import {console2} from "forge-std/console2.sol";
 /// @dev Safe to run on a cron/loop. Skips gracefully when queue is below threshold.
 contract RunKeeper is EyesScriptBase {
     function run() external {
-        if (block.chainid == BaseSepoliaConfig.CHAIN_ID) {
-            _requireChain(BaseSepoliaConfig.CHAIN_ID);
-        }
+        _enforceSupportedChain();
 
         address executorAddr = _resolveAddress("EYES_BUY_BURN_EXECUTOR", "buyBurnExecutor");
         address collectorAddr = _resolveAddress("EYES_FEE_COLLECTOR", "feeCollector");

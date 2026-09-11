@@ -10,6 +10,7 @@ import {EyesFeeRouter} from "../src/trading/EyesFeeRouter.sol";
 
 import {EyesScriptBase} from "./EyesScriptBase.sol";
 import {BaseSepoliaConfig} from "./config/BaseSepoliaConfig.sol";
+import {BaseMainnetConfig} from "./config/BaseMainnetConfig.sol";
 import {console2} from "forge-std/console2.sol";
 
 /// @title TransferOwnership
@@ -24,6 +25,8 @@ contract TransferOwnership is EyesScriptBase {
     function run() external {
         if (block.chainid == BaseSepoliaConfig.CHAIN_ID) {
             _requireChain(BaseSepoliaConfig.CHAIN_ID);
+        } else if (block.chainid == BaseMainnetConfig.CHAIN_ID) {
+            _requireChain(BaseMainnetConfig.CHAIN_ID);
         }
 
         address newOwner = _envAddress("NEW_OWNER");

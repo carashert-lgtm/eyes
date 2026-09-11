@@ -1,5 +1,7 @@
 export type LaunchPhase = 'Pending' | 'EyesWindow' | 'Trading'
 
+export type LaunchChainKey = 'base' | 'ethereum' | 'solana'
+
 export type LaunchBoost = {
   packageId: string
   label: string
@@ -12,6 +14,7 @@ export type LaunchBoost = {
 export type LaunchRecord = {
   id: string
   launchId: number
+  chainKey: LaunchChainKey
   name: string
   symbol: string
   creator: string
@@ -26,13 +29,18 @@ export type LaunchRecord = {
   feesEth24h: number
   eyesBurnedTotal: number
   boost: LaunchBoost | null
+  fomoUrl?: string
+  description?: string
+  website?: string
+  twitter?: string
+  telegram?: string
   createdAt: string
   updatedAt: string
 }
 
 export type LaunchesSnapshot = {
   updatedAt: string
-  source: 'indexer' | 'seed' | 'demo'
+  source: 'indexer'
   launches: LaunchRecord[]
 }
 
@@ -45,7 +53,7 @@ export type RankedLaunch = LaunchRecord & {
 
 export const EMPTY_LAUNCHES_SNAPSHOT: LaunchesSnapshot = {
   updatedAt: new Date(0).toISOString(),
-  source: 'seed',
+  source: 'indexer',
   launches: [],
 }
 

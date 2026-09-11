@@ -12,11 +12,12 @@ import {
 } from '@/lib/retention-config'
 import { getCurrentSeason } from '@/lib/season-utils'
 import { ROUTES, TOKENOMICS } from '@/lib/site-config'
+import { WalletPanel } from '@/components/wallet/ProfileWalletHome'
 import { useEyesBalance } from '@/hooks/useEyesBalance'
 
 export function UtilityCenter() {
   const season = getCurrentSeason()
-  const { tier, balanceFormatted, isConnected } = useEyesBalance()
+  const { tier, balanceFormatted, hasWallet } = useEyesBalance()
 
   if (!RETENTION_ENABLED) {
     return (
@@ -43,12 +44,14 @@ export function UtilityCenter() {
           Stake tiers gate tools, alerts, and visibility. Creator boosts and launch fees settle in
           $EYES — with transparent burns.
         </p>
-        {isConnected ? (
+        {hasWallet ? (
           <p className="mt-3 rounded-sm border border-border bg-surface px-3 py-2 text-sm">
             Your tier: <strong>{tier.badge} {tier.name}</strong> · {balanceFormatted} $EYES
           </p>
         ) : null}
       </div>
+
+      <WalletPanel compact />
 
       <section>
         <h2 className="mb-4 font-display text-lg font-bold text-foreground">Stake tiers</h2>
@@ -74,7 +77,7 @@ export function UtilityCenter() {
           ))}
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          On-chain stake verification wiring next. Tiers read wallet balance at launch.
+          On-chain stake vault coming post-launch. Tiers today use your live wallet balance.
         </p>
       </section>
 
@@ -101,6 +104,9 @@ export function UtilityCenter() {
               </li>
             ))}
           </ul>
+          <CtaButton href={ROUTES.appLaunches} className="mt-5" variant="secondary">
+            Boost a launch
+          </CtaButton>
         </div>
 
         <div className="rounded-sm border border-border bg-surface p-6">

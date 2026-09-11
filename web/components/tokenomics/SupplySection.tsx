@@ -1,12 +1,19 @@
 import { Container } from '@/components/ui/Container'
 import { SectionHeading } from '@/components/ui/SectionHeading'
 import { StatCard } from '@/components/ui/DiagramCard'
+import {
+  EYES_TOTAL_SUPPLY,
+  FOUNDER_SHARE,
+  formatTokensFull,
+  formatTokensShort,
+} from '@/lib/founder-share-config'
 
 const supplyFacts = [
   {
     label: 'Total supply',
-    value: '1,000,000,000',
+    value: formatTokensFull(EYES_TOTAL_SUPPLY),
     suffix: 'Fixed forever',
+    dense: true,
   },
   {
     label: 'Minting',
@@ -14,9 +21,9 @@ const supplyFacts = [
     suffix: 'At deployment only',
   },
   {
-    label: 'Team allocation',
-    value: 'None',
-    suffix: 'No hidden insider bucket',
+    label: 'Owner allocation',
+    value: `${FOUNDER_SHARE.totalPercent}%`,
+    suffix: `${formatTokensShort(FOUNDER_SHARE.totalTokens)} disclosed`,
   },
 ]
 
@@ -28,7 +35,7 @@ export function SupplySection() {
           <SectionHeading
             eyebrow="Supply"
             title="One billion $EYES. No surprise inflation."
-            description="The full supply is minted once at deployment. No ongoing emissions, no shadow team wallet, no 'trust us' unlock schedule."
+            description={`The full supply is minted once at deployment. Owner allocation (${FOUNDER_SHARE.totalPercent}%) is published in docs. LP and treasury inventory use separate buckets.`}
           />
 
           <div className="space-y-6">
@@ -48,7 +55,8 @@ export function SupplySection() {
                 and on-chain accountability. The platform eats its own cooking.
               </p>
               <p className="mt-4 font-mono-label text-muted-foreground">
-                No team allocation narrative unless explicitly added later
+                Owner allocation: {FOUNDER_SHARE.totalPercent}% (
+                {formatTokensShort(FOUNDER_SHARE.totalTokens)} $EYES)
               </p>
             </div>
           </div>

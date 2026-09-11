@@ -4,36 +4,36 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* Brand palette — Light Gold / Bitcoin glory */
-  --color-background: #faf7f0;
-  --color-foreground: #1c1917;
+  /* Brand palette — Black / Gold */
+  --color-background: #0a0908;
+  --color-foreground: #f5f0e6;
 
-  --color-surface: #fffcf5;
-  --color-card: #fffcf5;
-  --color-card-foreground: #1c1917;
+  --color-surface: #12100e;
+  --color-card: #14120f;
+  --color-card-foreground: #f5f0e6;
 
-  --color-popover: #fffcf5;
-  --color-popover-foreground: #1c1917;
+  --color-popover: #14120f;
+  --color-popover-foreground: #f5f0e6;
 
-  --color-border: #ecdcb0;
-  --color-input: #ecdcb0;
-  --color-ring: #c9a227;
+  --color-border: #3d3424;
+  --color-input: #3d3424;
+  --color-ring: #d4af37;
 
-  --color-muted: #f4ecda;
-  --color-muted-foreground: #7c6f57;
+  --color-muted: #1c1812;
+  --color-muted-foreground: #b8a88a;
 
-  --color-primary: #a97f12;
-  --color-primary-foreground: #fffdf7;
+  --color-primary: #d4af37;
+  --color-primary-foreground: #0a0908;
 
-  --color-accent-dim: #c9a227;
+  --color-accent-dim: #a97f12;
   --color-accent-glow: #eab308;
-  --color-edge: #b45309;
+  --color-edge: #b8860b;
 
-  --color-secondary: #f4ecda;
-  --color-secondary-foreground: #1c1917;
-  --color-accent: #f4ecda;
-  --color-accent-foreground: #1c1917;
-  --color-destructive: #b45309;
+  --color-secondary: #1f1a12;
+  --color-secondary-foreground: #f5f0e6;
+  --color-accent: #1f1a12;
+  --color-accent-foreground: #f5f0e6;
+  --color-destructive: #f87171;
 
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Syne", "IBM Plex Sans", sans-serif;
@@ -45,7 +45,7 @@
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 @layer base {
@@ -60,7 +60,7 @@
   }
   ::selection {
     background: #d4af37;
-    color: #1c1917;
+    color: #0a0908;
   }
 }
 
@@ -74,13 +74,13 @@
   }
 
   .bg-grid {
-    background-image: linear-gradient(to right, rgba(169, 127, 18, 0.09) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(169, 127, 18, 0.09) 1px, transparent 1px);
+    background-image: linear-gradient(to right, rgba(212, 175, 55, 0.07) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(212, 175, 55, 0.07) 1px, transparent 1px);
     background-size: 56px 56px;
   }
 
   .bg-scan {
-    background: radial-gradient(62% 46% at 50% 0%, rgba(212, 175, 55, 0.28) 0%, rgba(212, 175, 55, 0.1) 40%, transparent 74%);
+    background: radial-gradient(62% 46% at 50% 0%, rgba(212, 175, 55, 0.18) 0%, rgba(212, 175, 55, 0.06) 40%, transparent 74%);
   }
 
   .mask-fade-b {
@@ -89,7 +89,7 @@
   }
 
   .text-gradient-white {
-    background: linear-gradient(180deg, #e6bd3f 0%, #b8860b 55%, #8b6914 100%);
+    background: linear-gradient(180deg, #f5e6a8 0%, #d4af37 45%, #a97f12 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;

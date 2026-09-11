@@ -6,9 +6,13 @@ type StatCardProps = {
   value: string
   suffix?: string
   className?: string
+  /** Slightly smaller type for long numeric values (e.g. 1,000,000,000). */
+  dense?: boolean
 }
 
-export function StatCard({ label, value, suffix, className }: StatCardProps) {
+export function StatCard({ label, value, suffix, className, dense }: StatCardProps) {
+  const compact = dense ?? value.replace(/[^\d]/g, '').length >= 10
+
   return (
     <div
       className={cn(
@@ -17,7 +21,12 @@ export function StatCard({ label, value, suffix, className }: StatCardProps) {
       )}
     >
       <p className="font-mono-label text-muted-foreground">{label}</p>
-      <p className="mt-2 font-display text-2xl font-bold text-foreground sm:text-3xl">
+      <p
+        className={cn(
+          'mt-2 font-display font-bold tabular-nums tracking-tight text-foreground',
+          compact ? 'text-lg sm:text-xl lg:text-2xl' : 'text-2xl sm:text-3xl',
+        )}
+      >
         {value}
       </p>
       {suffix ? <p className="mt-1 text-xs text-primary">{suffix}</p> : null}

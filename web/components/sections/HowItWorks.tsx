@@ -34,8 +34,8 @@ export function HowItWorks() {
           Four steps. Zero sniper privilege.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-          From launch to open trading to platform-level value capture — the full
-          loop is on-chain and auditable.
+          From launch to open trading to on-chain fee routing — the full
+          loop is auditable.
         </p>
       </div>
 

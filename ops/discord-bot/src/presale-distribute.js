@@ -25,6 +25,14 @@ import {
   releaseTeamClaimSendClaim,
 } from './db.js'
 import { normalizePrivateKey, inspectPrivateKeyEnv } from './private-key.js'
+import {
+  createNonceManager,
+  isNonceError,
+  writeContractWithNonceRetry,
+} from './tx-send.js'
+
+/** Base mainnet $EYES — ignore stale Anvil env on production sends. */
+const BASE_MAINNET_EYES_TOKEN = '0xC845770d0f437B93886E152566EE926Aa9153C9e'
 
 const erc20TransferAbi = [
   {
@@ -55,28 +63,46 @@ const anvilLocal = defineChain({
   },
 })
 
+/** Bot chain — PRESALE_CHAIN_ID only (never NEXT_PUBLIC_CHAIN_ID; web Anvil flags must not affect Railway). */
+function getPresaleChainId() {
+  const raw = process.env.PRESALE_CHAIN_ID?.trim()
+  if (raw) return Number(raw)
+  return 8453
+}
+
 function getChainConfig() {
-  const chainId = Number(process.env.PRESALE_CHAIN_ID ?? process.env.NEXT_PUBLIC_CHAIN_ID ?? '8453')
+  const chainId = getPresaleChainId()
   if (chainId === 31337) {
     const rpc = process.env.NEXT_PUBLIC_ANVIL_RPC_URL ?? 'http://127.0.0.1:8545'
     return {
+      chainId,
       chain: { ...anvilLocal, rpcUrls: { default: { http: [rpc] } } },
       rpc,
+      mode: 'anvil',
     }
   }
   return {
+    chainId,
     chain: base,
     rpc: process.env.BASE_MAINNET_RPC_URL ?? 'https://mainnet.base.org',
+    mode: 'mainnet',
   }
 }
 
 function getTokenAddress() {
-  const addr =
+  const fromEnv =
     process.env.EYES_TOKEN_ADDRESS ??
     process.env.NEXT_PUBLIC_EYES_TOKEN_ADDRESS ??
     ''
-  if (!addr) throw new Error('EYES_TOKEN_ADDRESS not set')
-  return addr
+  const chainId = getPresaleChainId()
+  if (chainId === 8453 && fromEnv && fromEnv.toLowerCase() !== BASE_MAINNET_EYES_TOKEN.toLowerCase()) {
+    console.warn(
+      `[distributor] Ignoring EYES token env ${fromEnv} on Base mainnet; using ${BASE_MAINNET_EYES_TOKEN}`,
+    )
+    return BASE_MAINNET_EYES_TOKEN
+  }
+  if (!fromEnv) throw new Error('EYES_TOKEN_ADDRESS not set')
+  return fromEnv
 }
 
 function getDistributorKey() {
@@ -98,11 +124,19 @@ function isInsufficientGasError(message) {
 function formatSendError(err) {
   const msg = err instanceof Error ? err.message : String(err)
   if (isInsufficientGasError(msg)) return GAS_FUND_HINT
+  if (isNonceError(msg)) {
+    return 'Treasury nonce out of sync — retry `!presalesend run` in a few seconds (bot will refresh nonce).'
+  }
   return msg.slice(0, 160)
 }
 
+function isRetryableSendError(message) {
+  return isInsufficientGasError(message) || isNonceError(message)
+}
+
 async function sendPendingItem(item, ctx) {
-  const { dryRun, publicClient, walletClient, tokenAddress, balanceLeftRef } = ctx
+  const { dryRun, publicClient, walletClient, tokenAddress, balanceLeftRef, nonceManager, account, chain } =
+    ctx
   const amountWei = parseUnits(String(item.tokensOwed), 18)
   const label = formatItemLabel(item)
 
@@ -151,7 +185,12 @@ async function sendPendingItem(item, ctx) {
     item.type === 'team' ? claimed.tokensAmount : claimed.tokensOwed
 
   try {
-    const hash = await walletClient.writeContract({
+    const hash = await writeContractWithNonceRetry({
+      publicClient,
+      walletClient,
+      account,
+      chain,
+      nonceManager,
       address: tokenAddress,
       abi: erc20TransferAbi,
       functionName: 'transfer',
@@ -212,12 +251,12 @@ async function sendPendingItem(item, ctx) {
     const friendly = formatSendError(err)
     if (item.type === 'team') {
       releaseTeamClaimSendClaim(item.id)
-      if (!isInsufficientGasError(msg)) {
+      if (!isRetryableSendError(msg)) {
         markTeamClaimFailed(item.id, msg.slice(0, 200))
       }
     } else {
       releasePresaleSendClaim(item.id)
-      if (!isInsufficientGasError(msg)) {
+      if (!isRetryableSendError(msg)) {
         markPresaleFailed(item.id, msg.slice(0, 200))
       }
     }
@@ -237,12 +276,24 @@ function tryGetDistributorAccount() {
   }
 }
 
+function shortAddr(addr) {
+  if (!addr || addr.length < 10) return addr ?? '—'
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
+
 export async function getDistributorStatus() {
   const treasury = getTreasuryAddress()
   const tokenAddress = process.env.EYES_TOKEN_ADDRESS ?? process.env.NEXT_PUBLIC_EYES_TOKEN_ADDRESS ?? ''
-  const chainId = Number(process.env.PRESALE_CHAIN_ID ?? process.env.NEXT_PUBLIC_CHAIN_ID ?? '8453')
+  const chainId = getPresaleChainId()
+  const { rpc, mode } = getChainConfig()
   const accountOrError = tryGetDistributorAccount()
   const issues = []
+
+  if (mode === 'anvil' && !process.env.NEXT_PUBLIC_ANVIL_RPC_URL && rpc.includes('127.0.0.1')) {
+    issues.push(
+      'Bot is in Anvil mode (chain 31337) — localhost RPC is unreachable on Railway. Set PRESALE_CHAIN_ID=8453 plus mainnet token/RPC/key for production.',
+    )
+  }
 
   if (accountOrError.error) {
     const keyCheck = inspectPrivateKeyEnv(
@@ -258,6 +309,7 @@ export async function getDistributorStatus() {
       treasury,
       tokenAddress,
       chainId,
+      rpcMode: mode,
       distributorAddress: null,
       matchesTreasury: false,
       balanceEyes: null,
@@ -269,7 +321,9 @@ export async function getDistributorStatus() {
   const account = accountOrError
   const matchesTreasury = account.address.toLowerCase() === treasury
   if (!matchesTreasury) {
-    issues.push('Distributor private key does not match treasury wallet.')
+    issues.push(
+      `Distributor private key does not match treasury wallet (key → ${shortAddr(account.address)}, treasury → ${shortAddr(treasury)}).`,
+    )
   }
   if (!tokenAddress) {
     issues.push('EYES_TOKEN_ADDRESS not set')
@@ -279,7 +333,7 @@ export async function getDistributorStatus() {
   let balanceEth = null
   if (tokenAddress && !accountOrError.error) {
     try {
-      const { chain, rpc } = getChainConfig()
+      const { chain } = getChainConfig()
       const publicClient = createPublicClient({ chain, transport: http(rpc) })
       const [tokenBal, ethBal] = await Promise.all([
         publicClient.readContract({
@@ -308,6 +362,7 @@ export async function getDistributorStatus() {
     treasury,
     tokenAddress,
     chainId,
+    rpcMode: mode,
     distributorAddress: account.address,
     matchesTreasury,
     balanceEyes,
@@ -371,6 +426,7 @@ export async function distributePresaleTokens(options = {}) {
   const sent = []
   const skipped = []
   const balanceLeftRef = { value: treasuryBalance }
+  const nonceManager = createNonceManager(publicClient, account.address)
 
   for (const item of pending) {
     const result = await sendPendingItem(item, {
@@ -379,6 +435,9 @@ export async function distributePresaleTokens(options = {}) {
       walletClient,
       tokenAddress,
       balanceLeftRef,
+      nonceManager,
+      account,
+      chain,
     })
     if (result.sent) sent.push(result.sent)
     if (result.skipped) {

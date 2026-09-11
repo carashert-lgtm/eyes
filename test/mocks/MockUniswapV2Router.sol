@@ -32,7 +32,7 @@ contract MockUniswapV2Router {
     {
         amounts = new uint256[](path.length);
         amounts[0] = amountIn;
-        if (path.length > 1 && path[1] == _eyes) {
+        if (path.length > 1 && path[1] == _eyesToken() && _eyesToken() != address(0)) {
             amounts[1] = (amountIn * eyesSwapRate) / 1 ether;
         } else if (path.length > 1) {
             amounts[1] = amountIn * 100;
@@ -73,12 +73,12 @@ contract MockUniswapV2Router {
         uint256 amountOut;
         address pair = MockUniswapV2Factory(factory).getPair(path[0], path[1]);
 
-        if (path[1] == _eyesToken()) {
+        if (path[1] == _eyesToken() && _eyesToken() != address(0)) {
             amountOut = (msg.value * eyesSwapRate) / 1 ether;
-            if (pair == address(0)) {
-                require(IERC20(path[1]).transfer(to, amountOut), "MockRouter: eyes out");
-            } else {
+            if (pair != address(0) && IERC20(path[1]).balanceOf(pair) >= amountOut) {
                 MockUniswapV2Pair(pair).pushToken(path[1], to, amountOut);
+            } else {
+                require(IERC20(path[1]).transfer(to, amountOut), "MockRouter: eyes out");
             }
         } else {
             require(pair != address(0), "MockRouter: no pair");

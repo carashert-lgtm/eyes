@@ -29,7 +29,8 @@ export function Solution() {
           </h2>
           <p className="mt-5 text-base leading-relaxed text-muted-foreground">
             We built a launch flow that protects the opening window, locks
-            liquidity permanently, and routes value back to the platform token.
+            liquidity permanently, and routes trading fees to creators and the
+            buy-and-burn queue.
           </p>
         </div>
 

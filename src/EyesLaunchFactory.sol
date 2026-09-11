@@ -35,6 +35,11 @@ contract EyesLaunchFactory is Ownable, IEyesLaunchFactory {
     error LiquidityAlreadyLocked();
     error LaunchesDisabled();
     error LauncherNotApproved();
+    error EyesWindowClosed();
+    error InvalidPhase();
+
+    /// @dev Dead address for supply/LP disposal — recognized by DEX scanners and FOMO.
+    address internal constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
     /// @notice Global kill-switch for new launches. OWNER only.
     bool public launchesEnabled = true;
@@ -202,6 +207,7 @@ contract EyesLaunchFactory is Ownable, IEyesLaunchFactory {
         if (info.token == address(0)) revert UnknownLaunch();
 
         EyesLaunchToken launchToken = EyesLaunchToken(info.token);
+        launchToken.setUniswapPair(pair);
         launchToken.markLiquidityLocked();
         launchToken.setApprovedBuySource(pair, true);
         if (feeRouter != address(0)) {
@@ -210,6 +216,12 @@ contract EyesLaunchFactory is Ownable, IEyesLaunchFactory {
 
         info.pair = pair;
         info.liquidityLocked = true;
+
+        // Burn unsold factory inventory so scanners do not flag insider concentration.
+        uint256 remainder = launchToken.balanceOf(address(this));
+        if (remainder > 0) {
+            launchToken.transfer(DEAD, remainder);
+        }
 
         emit LiquidityLockCommitted(launchId, info.token, pair, lpAmount);
 
@@ -224,6 +236,18 @@ contract EyesLaunchFactory is Ownable, IEyesLaunchFactory {
     function closeEyesWindow(uint256 launchId) external onlyOwner {
         EyesTypes.LaunchInfo storage info = _launches[launchId];
         if (info.token == address(0)) revert UnknownLaunch();
+        if (info.phase != EyesTypes.LaunchPhase.EyesWindow) revert InvalidPhase();
+
+        EyesLaunchToken(info.token).endEyesWindow();
+        info.phase = EyesTypes.LaunchPhase.Trading;
+    }
+
+    /// @notice Sync launch phase after the Eyes Window ends. Callable by anyone.
+    function closeEyesWindowIfExpired(uint256 launchId) external {
+        EyesTypes.LaunchInfo storage info = _launches[launchId];
+        if (info.token == address(0)) revert UnknownLaunch();
+        if (info.phase != EyesTypes.LaunchPhase.EyesWindow) return;
+        if (block.timestamp <= info.eyesWindowEnd) revert EyesWindowClosed();
 
         EyesLaunchToken(info.token).endEyesWindow();
         info.phase = EyesTypes.LaunchPhase.Trading;

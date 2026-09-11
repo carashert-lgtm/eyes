@@ -24,8 +24,8 @@ export function buildHelpEmbeds(isOwner) {
     .setTitle('Eyes Open · commands')
     .setDescription(
       [
-        '**Team pool** — `!linkwallet` once, then `!claim amount` for unlocked tokens.',
-        '**Presale** — register on the site; tier allocation sends after owner runs `!presalesend`.',
+        '**Presale** — contribute at eyesopen.to/presale, then `!presalestatus`',
+        '**Team pool** — `!linkwallet` once, then `!claim amount` for unlocked tokens',
         'Not financial advice · not an investment product.',
       ].join('\n'),
     )
@@ -41,13 +41,19 @@ export function buildHelpEmbeds(isOwner) {
         inline: true,
       },
       {
-        name: 'Wallet',
-        value: '`!linkwallet 0x…`',
+        name: 'Wallet / presale',
+        value: '`!linkwallet` · `!mywallet` · `!presalestatus`',
         inline: true,
       },
       {
         name: 'Team Space',
         value: 'Staff code → activate on site (`/team/activate`).',
+        inline: false,
+      },
+      {
+        name: 'Your X (Launchpad Command)',
+        value:
+          '`!xlist` · `!xstatus TICKER` · `!xcheck TICKER` · `!xpost TICKER` · `!xboost TICKER`\nOnly the X account linked on your LPC seat.',
         inline: false,
       },
     )
@@ -61,7 +67,8 @@ export function buildHelpEmbeds(isOwner) {
     .addFields(
       {
         name: 'Sends',
-        value: '`!sendstatus` · `!keycheck` · `!presalesend` · `!presalesend run`',
+        value:
+          '`!sendstatus` · `!presalesend run` · `!sendeyes @user AMOUNT`\n`!sendeyes pending` · `!sendeyes confirm ID` · `!walletof @user`',
         inline: false,
       },
       {
@@ -77,7 +84,19 @@ export function buildHelpEmbeds(isOwner) {
       },
       {
         name: 'Ops',
-        value: '`!discordinvite` · `!telegraminvite` · `!refclick` · `!giverole` · `!whoami`',
+        value:
+          '`!discordinvite` · `!telegraminvite` · `!refclick` · `!giverole` · `!whoami`',
+        inline: false,
+      },
+      {
+        name: 'Launchpad Command (X)',
+        value:
+          'Same `!x` commands as everyone — each Discord id can only move its own linked X account.',
+        inline: false,
+      },
+      {
+        name: 'Moderation',
+        value: '`!setmodlog #channel` · `!modlogstatus` · `!clearmodlog`',
         inline: false,
       },
     )

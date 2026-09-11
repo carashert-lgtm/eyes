@@ -13,7 +13,24 @@ This document is the canonical reference for the public tokenomics model. User-f
 | Token | $EYES (Eyes Open) |
 | Total supply | 1,000,000,000 |
 | Minting | Once at deploy — no further mint |
-| Team allocation | None in the official model |
+| Owner allocation | **10%** (100,000,000 $EYES) — disclosed upfront |
+
+### Owner allocation breakdown (10%)
+
+| Recipient | Share | Tokens |
+|-----------|-------|--------|
+| Owner | 10% | 100,000,000 $EYES |
+| **Total owner allocation** | **10%** | **100,000,000 $EYES** |
+
+Vesting and unlocks are operational (Team Space / Discord), not a hidden mint. Public presale cap is separate (see presale config).
+
+### Supply budget (reference)
+
+| Bucket | Share | Tokens (approx.) |
+|--------|-------|------------------|
+| Owner allocation | 10% | 100M |
+| Public presale cap | 20% | 200M (max via presale) |
+| Remaining (treasury / LP / ecosystem) | 70% | 700M |
 
 ---
 

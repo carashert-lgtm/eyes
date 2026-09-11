@@ -115,3 +115,63 @@ export const RANKING_WEIGHTS = {
   fees: 0.2,
   recency: 0.1,
 } as const
+
+/** USD reference for $EYES settlement math — override when oracle wired. */
+export const EYES_USD_PRICE = Number(process.env.NEXT_PUBLIC_EYES_USD_PRICE ?? '0.002')
+
+const TIER_EARLY_ALERT_MINUTES: Record<StakeTierId, number> = {
+  scout: 0,
+  builder: 15,
+  operator: 30,
+  core: 60,
+}
+
+const TIER_BOOST_DISCOUNT: Record<StakeTierId, number> = {
+  scout: 0,
+  builder: 5,
+  operator: 10,
+  core: 20,
+}
+
+export function tierEarlyAlertMinutes(tierId: StakeTierId): number {
+  return TIER_EARLY_ALERT_MINUTES[tierId]
+}
+
+export function tierBoostDiscountPercent(tierId: StakeTierId): number {
+  return TIER_BOOST_DISCOUNT[tierId]
+}
+
+export function computeLaunchFeeEyes(tierId: StakeTierId = 'scout') {
+  const baseUsd = LAUNCH_FEE_EYES.ethEquivalentUsd
+  const discountedUsd = baseUsd * (1 - LAUNCH_FEE_EYES.eyesDiscountPercent / 100)
+  const tierExtra = tierBoostDiscountPercent(tierId)
+  const finalUsd = discountedUsd * (1 - tierExtra / 100)
+  const eyesCost = Math.ceil(finalUsd / Math.max(EYES_USD_PRICE, 0.000001))
+  const burnAmount = Math.floor((eyesCost * LAUNCH_FEE_EYES.burnPercent) / 100)
+  const treasuryAmount = eyesCost - burnAmount
+  return { eyesCost, burnAmount, treasuryAmount, finalUsd }
+}
+
+export function minLaunchFeeTreasuryAmount(): number {
+  return Math.min(
+    ...EYES_STAKE_TIERS.map((t) => computeLaunchFeeEyes(t.id).treasuryAmount),
+  )
+}
+
+export function computeBoostCost(
+  packageId: string,
+  tierId: StakeTierId = 'scout',
+): {
+  package: (typeof CREATOR_BOOST_PACKAGES)[number]
+  eyesCost: number
+  burnAmount: number
+  treasuryAmount: number
+} | null {
+  const pkg = CREATOR_BOOST_PACKAGES.find((p) => p.id === packageId)
+  if (!pkg) return null
+  const discount = tierBoostDiscountPercent(tierId)
+  const eyesCost = Math.ceil(pkg.eyesCost * (1 - discount / 100))
+  const burnAmount = Math.floor((eyesCost * pkg.burnPercent) / 100)
+  const treasuryAmount = eyesCost - burnAmount
+  return { package: pkg, eyesCost, burnAmount, treasuryAmount }
+}

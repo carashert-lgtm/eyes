@@ -19,6 +19,6 @@ export async function GET() {
       label: a.label,
       minTier: a.minTier,
     })),
-    delivery: 'in-app and webhook wiring next — higher tiers get earlier access',
+    delivery: 'In-app feed live at /app — tier-gated early access on Utility and Launches',
   })
 }
